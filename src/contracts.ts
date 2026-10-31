@@ -6,15 +6,15 @@ export const Emotion = z.enum(['neutral', 'happy', 'confused', 'sad', 'angry']).
 export const Settings = z.object({ pack: Pack, voiceSpeed: z.number().min(0.5).max(1.5), subtitles: z.boolean(), notifications: z.boolean() }).openapi('Settings');
 export const User = z.object({ id: z.string().uuid(), kind: z.enum(['guest', 'member']), displayName: z.string(), email: z.string().nullable(), isMock: z.boolean(), createdAt: z.string() }).openapi('User');
 export const Auth = z.object({ accessToken: z.string(), refreshToken: z.string(), expiresIn: z.number(), authProvider: z.enum(['demo', 'supabase']), user: User, migrated: z.boolean() }).openapi('AuthSession');
-export const Personality = z.object({ id: z.string(), name: z.string(), description: z.string(), assetKey: z.string() }).openapi('Personality');
-export const Character = z.object({ id: z.string(), name: z.string(), role: z.string(), description: z.string(), emoji: z.string(), assetKey: z.string(), personalities: z.array(Personality) }).openapi('Character');
+export const Personality = z.object({ id: z.string(), name: z.string(), description: z.string(), assetKey: z.string(), clientKey:z.string().optional(), short:z.string().optional(), level:z.string().optional() }).openapi('Personality');
+export const Character = z.object({ id: z.string(), name: z.string(), role: z.string(), description: z.string(), emoji: z.string(), assetKey: z.string(), personalities: z.array(Personality), clientKey:z.string().optional(), call:z.string().optional(), free:z.boolean().optional(), imageUrl:z.string().optional(), cardUrl:z.string().optional() }).openapi('Character');
 export const Choice = z.object({ id: z.string(), text: z.string() }).openapi('Choice');
 export const Cue = z.object({ k: z.enum(['표정', '억양', '망설임', '침묵']), v: z.string().trim().min(1).max(400) }).openapi('NonverbalCue');
 export const Clue = z.object({ k: z.string().min(1).max(80), v: z.string().min(1).max(1200) }).openapi('HintClue');
 export const Perspective = z.object({ who: z.string().min(1).max(100), meaning: z.string().min(1).max(1200), cue: z.string().min(1).max(400) }).openapi('Perspective');
-export const Scene = z.object({ id: z.string(), title: z.string(), situation: z.string(), goal: z.string(), pack: Pack, characterId: z.string(), personalityId: z.string(), nodeCount: z.number(), estimatedMinutes: z.number() }).openapi('Scene');
-export const Chapter = z.object({ id: z.string(), no: z.number(), characterId: z.string(), title: z.string(), desc: z.string(), locked: z.boolean(),
-  subs: z.array(z.object({ id: z.string(), title: z.string(), sceneId: z.string(), personalityId: z.string(), state: z.enum(['done', 'now', 'open', 'locked']), score: z.number().nullable() })),
+export const Scene = z.object({ id: z.string(), title: z.string(), situation: z.string(), goal: z.string(), pack: Pack, characterId: z.string(), personalityId: z.string(), nodeCount: z.number(), estimatedMinutes: z.number(), backgroundUrl:z.string().optional(), chapterId:z.string().optional(), source:z.string().optional(), clientKey:z.string().optional() }).openapi('Scene');
+export const Chapter = z.object({ id: z.string(), no: z.number(), characterId: z.string(), title: z.string(), desc: z.string(), locked: z.boolean(), displayLabel:z.string().optional(), pack:Pack.optional(), source:z.enum(['curriculum','examples','personal']).optional(), generationStatus:z.enum(['ready','generating','failed']).optional(),
+  subs: z.array(z.object({ id: z.string(), title: z.string(), sceneId: z.string(), personalityId: z.string(), state: z.enum(['done', 'now', 'open', 'locked']), score: z.number().nullable(), availability:z.enum(['ready','generating','unavailable']).optional() })),
 }).openapi('Chapter');
 export const AudioMetrics = z.object({ durationMs: z.number(), pauseCount: z.number(), silenceRatio: z.number(), fillerCount: z.number(), speed: z.number(), speedUnit: z.enum(['characters_per_minute', 'words_per_minute']), measurement: z.string(), estimated: z.boolean() }).openapi('AudioMetrics');
 export const Feedback = z.object({
@@ -29,7 +29,7 @@ export const Session = z.object({
   lives: z.number(), initialLives: z.number(), nodeIndex: z.number(), nodeCount: z.number(),
   briefing: z.object({ partner: z.string(), situation: z.string(), goal: z.string() }),
   npc: z.object({ text: z.string(), emotion: Emotion, assetKey: z.string(), action: z.string().default(''), cues: z.array(Cue).default([]) }), choices: z.array(Choice),
-  hintsUsed: z.number(), createdAt: z.string(), updatedAt: z.string(),
+  chapterId:z.string().nullable().default(null), backgroundUrl:z.string().nullable().default(null), branchId:z.string().nullable().default(null), hintsUsed: z.number(), createdAt: z.string(), updatedAt: z.string(),
 }).openapi('PlaySession');
 export const Turn = z.object({ id: z.string().uuid(), clientTurnId: z.string(), inputType: z.enum(['text', 'choice', 'voice']), text: z.string(),
   outcome: z.enum(['correct', 'misunderstanding', 'clarify']), confidence: z.number(), feedback: Feedback,
@@ -40,7 +40,7 @@ export const Turn = z.object({ id: z.string().uuid(), clientTurnId: z.string(), 
 export const Result = z.object({ sessionId: z.string(), passed: z.boolean(), score: z.number(),
   goodUtterances: z.array(z.object({ text: z.string(), reason: z.string() })),
   improvableUtterances: z.array(z.object({ text: z.string(), betterExpression: z.string(), reason: z.string(), mistakeId: z.string().nullable() })),
-  rewardCoins: z.number(), durationMs: z.number(), nextSceneId: z.string().nullable(),
+  ending:z.object({id:z.string(),kind:z.enum(['happy','bad']),title:z.string(),text:z.string()}).nullable().default(null), rewardCoins: z.number(), durationMs: z.number(), nextSceneId: z.string().nullable(),
   achievement: z.object({ reach: z.number().min(0).max(100), infer: z.number().min(0).max(100), self: z.number().min(0).max(100) }).nullable().default(null),
 }).openapi('SessionResult');
 export const TurnResult = z.object({ turn: Turn, session: Session, result: Result.nullable(),

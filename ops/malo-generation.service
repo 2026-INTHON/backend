@@ -1,0 +1,9 @@
+[Unit]
+Description=Malo durable scenario generation step
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/malo-generation-worker.py
+TimeoutStartSec=300
+Nice=10
