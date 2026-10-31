@@ -1,0 +1,55 @@
+services:
+  gateway:
+    image: caddy:2
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      backend: {condition: service_healthy}
+    mem_limit: 256m
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    env_file: ./backend/.env
+    environment:
+      MALO_AI_URL: http://ai:8000
+      MALO_PUBLIC_BASE_URL: https://inthon-demo-20261031-dh.koreacentral.cloudapp.azure.com
+      MALO_DB_PATH: /data/malo.sqlite
+      MALO_DATA_MODE: supabase
+    volumes: [backend_data:/data]
+    depends_on:
+      ai: {condition: service_healthy}
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 1g
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      retries: 4
+      start_period: 20s
+  ai:
+    build: ./ai
+    restart: unless-stopped
+    env_file: ./ai/.env
+    environment:
+      MALO_ENV: production
+      MALO_AI_DATA_DIR: /data
+      MALO_AI_ROOT_PATH: /ai
+    volumes: [ai_data:/data]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 1g
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)"]
+      interval: 20s
+      timeout: 5s
+      retries: 4
+volumes:
+  caddy_data:
+  caddy_config:
+  backend_data:
+  ai_data:

@@ -1,0 +1,14 @@
+inthon-demo-20261031-dh.koreacentral.cloudapp.azure.com {
+  header X-Content-Type-Options nosniff
+  header Referrer-Policy no-referrer
+  request_body {
+    max_size 6MB
+  }
+  redir / /docs 302
+  handle_path /ai/* {
+    reverse_proxy ai:8000
+  }
+  handle {
+    reverse_proxy backend:3000
+  }
+}

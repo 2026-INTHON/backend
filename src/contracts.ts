@@ -1,0 +1,67 @@
+import { z } from '@hono/zod-openapi';
+
+export { z };
+export const Pack = z.enum(['ko', 'en']).openapi('Pack');
+export const Emotion = z.enum(['neutral', 'happy', 'confused', 'sad', 'angry']).openapi('Emotion');
+export const Settings = z.object({ pack: Pack, voiceSpeed: z.number().min(0.5).max(1.5), subtitles: z.boolean(), notifications: z.boolean() }).openapi('Settings');
+export const User = z.object({ id: z.string().uuid(), kind: z.enum(['guest', 'member']), displayName: z.string(), email: z.string().nullable(), isMock: z.boolean(), createdAt: z.string() }).openapi('User');
+export const Auth = z.object({ accessToken: z.string(), refreshToken: z.string(), expiresIn: z.number(), authProvider: z.enum(['demo', 'supabase']), user: User, migrated: z.boolean() }).openapi('AuthSession');
+export const Personality = z.object({ id: z.string(), name: z.string(), description: z.string(), assetKey: z.string() }).openapi('Personality');
+export const Character = z.object({ id: z.string(), name: z.string(), role: z.string(), description: z.string(), emoji: z.string(), assetKey: z.string(), personalities: z.array(Personality) }).openapi('Character');
+export const Choice = z.object({ id: z.string(), text: z.string() }).openapi('Choice');
+export const Scene = z.object({ id: z.string(), title: z.string(), situation: z.string(), goal: z.string(), pack: Pack, characterId: z.string(), personalityId: z.string(), nodeCount: z.number(), estimatedMinutes: z.number() }).openapi('Scene');
+export const AudioMetrics = z.object({ durationMs: z.number(), pauseCount: z.number(), silenceRatio: z.number(), fillerCount: z.number(), speed: z.number(), speedUnit: z.enum(['characters_per_minute', 'words_per_minute']), measurement: z.string(), estimated: z.boolean() }).openapi('AudioMetrics');
+export const Feedback = z.object({
+  tone: z.object({ score: z.number(), label: z.string(), source: z.literal('text_politeness') }),
+  speed: z.object({ value: z.number(), unit: z.string(), estimated: z.boolean() }).nullable(),
+  hesitation: z.object({ pauseCount: z.number(), fillerCount: z.number(), estimated: z.boolean(), note: z.string() }).nullable(),
+  message: z.string(), betterExpression: z.string(), reason: z.string(),
+}).openapi('TurnFeedback');
+export const Session = z.object({
+  id: z.string().uuid(), sceneId: z.string(), characterId: z.string(), personalityId: z.string(), pack: Pack,
+  aiMode: z.enum(['mock', 'live']), status: z.enum(['active', 'paused', 'succeeded', 'failed', 'abandoned']),
+  lives: z.number(), initialLives: z.number(), nodeIndex: z.number(), nodeCount: z.number(),
+  briefing: z.object({ partner: z.string(), situation: z.string(), goal: z.string() }),
+  npc: z.object({ text: z.string(), emotion: Emotion, assetKey: z.string() }), choices: z.array(Choice),
+  hintsUsed: z.number(), createdAt: z.string(), updatedAt: z.string(),
+}).openapi('PlaySession');
+export const Turn = z.object({ id: z.string().uuid(), clientTurnId: z.string(), inputType: z.enum(['text', 'choice', 'voice']), text: z.string(),
+  outcome: z.enum(['correct', 'misunderstanding', 'clarify']), confidence: z.number(), feedback: Feedback,
+  npcReply: z.string(), emotion: Emotion, lifeDelta: z.number(), provider: z.string(), isMock: z.boolean(), createdAt: z.string(),
+}).openapi('Turn');
+export const Result = z.object({ sessionId: z.string(), passed: z.boolean(), score: z.number(),
+  goodUtterances: z.array(z.object({ text: z.string(), reason: z.string() })),
+  improvableUtterances: z.array(z.object({ text: z.string(), betterExpression: z.string(), reason: z.string(), mistakeId: z.string().nullable() })),
+  rewardCoins: z.number(), durationMs: z.number(), nextSceneId: z.string().nullable(),
+}).openapi('SessionResult');
+export const TurnResult = z.object({ turn: Turn, session: Session, result: Result.nullable(),
+  oopsMoment: z.object({ triggered: z.boolean(), lifeDelta: z.number(), assetKey: z.string() }), mistakeId: z.string().nullable(),
+}).openapi('SubmitTurnResult');
+export const Mistake = z.object({ id: z.string(), sessionId: z.string(), turnId: z.string(), sceneTitle: z.string(),
+  original: z.string(), betterExpression: z.string(), reason: z.string(), category: z.enum(['politeness', 'clarity']),
+  pack: Pack, practiceCount: z.number(), resolved: z.boolean(), createdAt: z.string(),
+}).openapi('Mistake');
+export const Wallet = z.object({ coins: z.number(), currency: z.literal('MALO_COIN'), realMoney: z.literal(false) }).openapi('Wallet');
+export const LedgerEntry = z.object({ id: z.string(), amount: z.number(), reason: z.string(), createdAt: z.string() }).openapi('LedgerEntry');
+export const Streak = z.object({ current: z.number(), longest: z.number(), lastCheckIn: z.string().nullable() }).openapi('Streak');
+export const Home = z.object({ user: User, wallet: Wallet, settings: Settings, resumeSession: Session.nullable(), todayScene: Scene, otherScenes: z.array(Scene),
+  celebration: z.object({ id: z.string(), days: z.number(), message: z.string() }).nullable(),
+}).openapi('Home');
+export const Records = z.object({ completedScenes: z.number(), failedScenes: z.number(), totalTurns: z.number(), averageToneScore: z.number().nullable(),
+  toneSource: z.literal('text_politeness'), toneTrend: z.array(z.object({ date: z.string(), score: z.number() })),
+  frequentMistakes: z.array(z.object({ category: z.string(), count: z.number() })), streak: Streak,
+  recentSessions: z.array(z.object({ sessionId: z.string(), title: z.string(), status: z.string(), score: z.number().nullable(), createdAt: z.string() })),
+}).openapi('LearningRecords');
+export const SpeechDraft = z.object({ transcriptId: z.string(), text: z.string(), editable: z.literal(true), audioMetrics: AudioMetrics, expiresAt: z.string() }).openapi('SpeechDraft');
+export const AudioAsset = z.object({ audioUrl: z.string(), assetId: z.string(), mimeType: z.literal('audio/mpeg'), cached: z.boolean(), expiresIn: z.number(), voice: z.string() }).openapi('AudioAsset');
+export const ErrorBody = z.object({ error: z.object({ code: z.string(), message: z.string(), retryable: z.boolean(), requestId: z.string(), details: z.unknown().optional() }) }).openapi('ApiError');
+export const envelope = <S extends z.ZodType>(schema: S) => z.object({ data: schema, meta: z.object({ requestId: z.string(), apiVersion: z.literal('v1') }) });
+
+export type SettingsValue = z.infer<typeof Settings>;
+export type UserValue = z.infer<typeof User>;
+export type SceneValue = z.infer<typeof Scene>;
+export type SessionValue = z.infer<typeof Session>;
+export type TurnValue = z.infer<typeof Turn>;
+export type ResultValue = z.infer<typeof Result>;
+export type MistakeValue = z.infer<typeof Mistake>;
+export type MetricsValue = z.infer<typeof AudioMetrics>;
