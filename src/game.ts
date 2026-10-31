@@ -16,7 +16,7 @@ export function getPlay(p: Profile, id: string) {
   if (!play) throw new ApiError('SESSION_NOT_FOUND', '장면을 찾지 못했어요.', 404);
   return play;
 }
-export function activeNode(play:Play){const node=play.scenario.nodes[Math.min(play.nodeIndex,play.scenario.nodes.length-1)];const override=play.scenario.routes?.find(r=>r.id===play.branchId)?.overrides.find(o=>o.nodeId===node.id);return override?{...node,...override}:node;}
+export function activeNode(play:Play){const node=play.scenario.nodes[Math.min(play.nodeIndex,play.scenario.nodes.length-1)];const override=play.scenario.routes?.find(r=>r.id===play.branchId)?.overrides.find(o=>o.nodeId===node.id);return override?{...node,npcText:override.npcText,goodExample:override.goodExample,hiddenThought:override.hiddenThought}:node;}
 export function briefingFor(s:Scenario){return {title:s.title,partner:s.partnerName||characters.find(c=>c.id===s.characterId)?.role||s.characterId,situation:s.situation.split(/(?<=[.!?])\s+|\n+/).filter(Boolean).slice(0,2).join(' '),goal:s.goal};}
 export function publicPlay(play: Play): SessionValue {
   const s = play.scenario, node = activeNode(play);
