@@ -146,14 +146,16 @@ function finish(p: Profile, play: Play) {
   const latest=[...new Map(play.history.map((turn,i)=>[turn.nodeId||`legacy-${i}`,turn])).values()];
   const good = latest.filter(t => t.outcome === 'correct'), bad = play.history.filter(t => t.outcome === 'misunderstanding' && !t.native);
   const passed = play.status === 'succeeded';
+  // A completed farewell can omit one redundant closing beat; it is not a missed goal.
+  const goalCount=Math.max(1,passed?latest.length:play.scenario.nodes.length);
   const quality=good.reduce((sum,t)=>sum+(t.evaluation?.mark==='△'?.65:1),0);
   const rewardCoins = passed ? 30 : 5;
-  play.result = { sessionId: play.id,report:null, passed, score: Math.max(0, Math.min(100, Math.round((quality / play.scenario.nodes.length) * 100 - bad.length * 8 - play.hintsUsed * 2))),
+  play.result = { sessionId: play.id,report:null, passed, score: Math.max(0, Math.min(100, Math.round((quality / goalCount) * 100 - bad.length * 8 - play.hintsUsed * 2))),
     goodUtterances: good.filter(t=>t.evaluation?.mark!=='△').map(t => ({ text: t.text, reason: t.feedback.reason })),
     improvableUtterances: play.history.filter(t => t.outcome !== 'correct'||t.evaluation?.mark==='△').map(t => ({ text: t.text, betterExpression: t.feedback.betterExpression, reason: t.feedback.reason, mistakeId: p.state.mistakes.find(m => m.turnId === t.id)?.id || null })),
     rewardCoins, durationMs: Date.now() - Date.parse(play.createdAt), nextSceneId: play.scenario.nextSceneId ?? null, ending: Endings.presentation(play),
     achievement: {
-      reach: Math.round(good.length / play.scenario.nodes.length * 100),
+      reach: Math.round(good.length / goalCount * 100),
       infer: Math.max(30, 100 - (play.hintKeys || []).filter(k => k.endsWith(':1')).length * 15 - ((play.hintKeys || []).filter(k => k.endsWith(':2')).length + Math.max(0, play.hintsUsed - (play.hintKeys || []).length)) * 25),
       self: Math.max(30, 100 - play.history.filter(t => t.native).length * 25 - bad.length * 15),
     } };
