@@ -43,6 +43,8 @@ npm run build
 
 `docs/openapi.json`은 코드의 요청/응답 스키마에서 생성합니다. Swagger의 Authorize에 게스트 생성 응답 `accessToken`을 입력하세요.
 
+이미지 배포 확인은 운영자 `.env`가 있는 환경에서 `node --env-file=.env scripts/smoke-images.mjs`로 실행합니다. 20개 이미지·콘텐츠 해시·캐시 응답을 검증합니다. 이미지가 이미 준비되어 있어야 하며 새 이미지를 만들기 위한 스크립트는 AI 저장소에 있습니다.
+
 ## 데이터와 인증
 
 - Guest도 일반 회원과 같은 학습 상태를 저장합니다. 재실행 시 토큰을 Expo SecureStore 등에 보관하고 refresh합니다.
