@@ -15,7 +15,7 @@ const guest = async () => (await request('/auth/guest', {})).data;
 
 test('Clues, staged hints, language help, correction comparison and achievement persist end to end', async () => {
   const auth = await guest(), token = auth.accessToken;
-  const session = (await request('/sessions', { sceneId: 'ko-manager-strict' }, token)).data;
+  const session = (await request('/sessions', { sceneId: 'ko-manager-strict',aiMode:'mock' }, token)).data;
   assert.ok(session.npc.action); assert.deepEqual(session.npc.cues.map((c: { k: string }) => c.k), ['표정', '억양']);
   assert.equal(session.npc.hiddenThought, undefined); assert.equal(session.npc.views, undefined);
   const h1 = (await request(`/sessions/${session.id}/hint`, { step: 1 }, token)).data;
@@ -59,7 +59,7 @@ test('Clues, staged hints, language help, correction comparison and achievement 
 
 test('Hints enforce ownership, pause and pending-turn boundaries; {} preserves the old second hint', async () => {
   const a = await guest(), b = await guest();
-  const s = (await request('/sessions', { sceneId: 'en-friend-calm' }, a.accessToken)).data;
+  const s = (await request('/sessions', { sceneId: 'en-friend-calm',aiMode:'mock' }, a.accessToken)).data;
   assert.equal((await request(`/sessions/${s.id}/hint`, { step: 1 }, b.accessToken)).status, 404);
   const legacy = (await request(`/sessions/${s.id}/hint`, {}, a.accessToken)).data;
   assert.equal(legacy.step, 2); assert.ok(legacy.hiddenThought); assert.ok(legacy.tip);
