@@ -106,8 +106,6 @@ export function buildScenario(characterId: string, personalityId: string, pack: 
     choices: [{ id: 'a', text: unclear }, { id: 'b', text: goodExample }, { id: 'c', text: bad }],
     nextNodeId: index + 1 < lines.length ? `${characterId}-${pack}-${index + 2}` : null,
   }));
-  const prefix = pack === 'en' ? { strict: 'Let us be specific. ', playful: 'Hey, no pressure. ', calm: 'Take your time. ' } : { strict: '구체적으로 이야기해 봐요. ', playful: '너무 긴장하지 말고요. ', calm: '천천히 이야기해 봐요. ' };
-  nodes[0].npcText = prefix[personalityId as keyof typeof prefix] + nodes[0].npcText;
   const scenario = { title: source.title, situation: source.situation, goal: source.goal, pack, characterId, personalityId, nodes };
   return { ...scenario, nodes: nodes.map(node => ({ ...node, ...learningSupport(scenario, node) })) };
 }
