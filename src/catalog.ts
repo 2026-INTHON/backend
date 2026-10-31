@@ -2,7 +2,7 @@ import type { SceneValue, z, Cue, Clue, Perspective } from './contracts';
 
 export type SceneNode = { id: string; npcText: string; goal: string; goodExample: string; hiddenThought: string; tip: string; choices: { id: string; text: string }[]; nextNodeId: string | null;
   action?: string; cues?: z.infer<typeof Cue>[]; clue?: z.infer<typeof Clue>[]; views?: z.infer<typeof Perspective>[] };
-export type Scenario = { title: string; situation: string; goal: string; pack: 'ko' | 'en'; characterId: string; personalityId: string; nodes: SceneNode[] };
+export type Scenario = { title: string; situation: string; goal: string; pack: 'ko' | 'en'; characterId: string; personalityId: string; nodes: SceneNode[]; chapterId?:string; backgroundUrl?:string; estimatedMinutes?:number; source?:string; clientKey?:string; nextSceneId?:string|null; branchAt?:number; routes?:{id:string;label:string;overrides:{nodeId:string;npcText:string;goodExample:string;hiddenThought:string}[]}[]; endings?:{id:string;kind:'happy'|'bad';title:string;text:string}[] };
 export const packs = [{ id: 'ko', name: '한국어팩', description: '상황과 관계에 맞는 말투를 연습해요.' }, { id: 'en', name: '영어팩', description: '짧은 상황극으로 영어 회화 감각을 길러요.' }];
 const personalities = [
   { id: 'strict', name: '까탈', description: '작은 표현도 놓치지 않아요. 구체적이고 배려하는 말이 필요해요.' },
@@ -115,7 +115,7 @@ export function buildScenario(characterId: string, personalityId: string, pack: 
 export function sceneId(characterId: string, personalityId: string, pack: string) { return `${pack}-${characterId}-${personalityId}`; }
 export function sceneSummary(scenario: Scenario, id = sceneId(scenario.characterId, scenario.personalityId, scenario.pack)): SceneValue {
   const { nodes, ...rest } = scenario;
-  return { ...rest, id, nodeCount: nodes.length, estimatedMinutes: 3 };
+  return { ...rest, id, nodeCount: nodes.length, estimatedMinutes: scenario.estimatedMinutes || 3 };
 }
 export function listScenes(pack: 'ko' | 'en' = 'ko', characterId?: string, personalityId?: string) {
   return characters.filter(c => !characterId || c.id === characterId).flatMap(c => c.personalities.filter(p => !personalityId || p.id === personalityId).map(p => sceneSummary(buildScenario(c.id, p.id, pack))));
