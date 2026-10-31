@@ -30,6 +30,7 @@ assert.equal((await call('/records', undefined, token)).completedScenes, 1);
 ok('guest-to-result-dictionary-demo-upgrade', { rewardCoins: result.rewardCoins, coins: wallet.coins });
 const spec = await fetch(origin + '/openapi.json').then(r => r.json());
 assert.ok(Object.keys(spec.paths).length >= 35); assert.ok(Object.keys(spec.paths).every(path => path.startsWith('/api/v1/')));
+assert.ok(spec.paths['/api/v1/audio/{assetId}']); assert.ok(Object.keys(spec.paths).every(path => !path.includes('/api/v1/api/v1')));
 const doc = await fetch(origin + '/docs'); assert.equal(doc.status, 200); ok('swagger-openapi', { paths: Object.keys(spec.paths).length });
 const aiHealth = await fetch(origin + '/ai/health'); assert.equal(aiHealth.status, 200);
 const protectedAi = await fetch(origin + '/ai/v1/persona-assets'); assert.equal(protectedAi.status, 401); ok('ai-service-protection');

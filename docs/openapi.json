@@ -21,231 +21,8 @@
       }
     },
     "schemas": {
-      "ApiError": {
-        "type": "object",
-        "properties": {
-          "error": {
-            "type": "object",
-            "properties": {
-              "code": {
-                "type": "string"
-              },
-              "message": {
-                "type": "string"
-              },
-              "retryable": {
-                "type": "boolean"
-              },
-              "requestId": {
-                "type": "string"
-              },
-              "details": {}
-            },
-            "required": [
-              "code",
-              "message",
-              "retryable",
-              "requestId"
-            ]
-          }
-        },
-        "required": [
-          "error"
-        ]
-      },
-      "AuthSession": {
-        "type": "object",
-        "properties": {
-          "accessToken": {
-            "type": "string"
-          },
-          "refreshToken": {
-            "type": "string"
-          },
-          "expiresIn": {
-            "type": "number"
-          },
-          "authProvider": {
-            "type": "string",
-            "enum": [
-              "demo",
-              "supabase"
-            ]
-          },
-          "user": {
-            "$ref": "#/components/schemas/User"
-          },
-          "migrated": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "accessToken",
-          "refreshToken",
-          "expiresIn",
-          "authProvider",
-          "user",
-          "migrated"
-        ]
-      },
-      "User": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "kind": {
-            "type": "string",
-            "enum": [
-              "guest",
-              "member"
-            ]
-          },
-          "displayName": {
-            "type": "string"
-          },
-          "email": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "isMock": {
-            "type": "boolean"
-          },
-          "createdAt": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "kind",
-          "displayName",
-          "email",
-          "isMock",
-          "createdAt"
-        ]
-      },
-      "Home": {
-        "type": "object",
-        "properties": {
-          "user": {
-            "$ref": "#/components/schemas/User"
-          },
-          "wallet": {
-            "$ref": "#/components/schemas/Wallet"
-          },
-          "settings": {
-            "$ref": "#/components/schemas/Settings"
-          },
-          "resumeSession": {
-            "$ref": "#/components/schemas/PlaySession"
-          },
-          "todayScene": {
-            "$ref": "#/components/schemas/Scene"
-          },
-          "otherScenes": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Scene"
-            }
-          },
-          "celebration": {
-            "type": [
-              "object",
-              "null"
-            ],
-            "properties": {
-              "id": {
-                "type": "string"
-              },
-              "days": {
-                "type": "number"
-              },
-              "message": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "id",
-              "days",
-              "message"
-            ]
-          }
-        },
-        "required": [
-          "user",
-          "wallet",
-          "settings",
-          "resumeSession",
-          "todayScene",
-          "otherScenes",
-          "celebration"
-        ]
-      },
-      "Wallet": {
-        "type": "object",
-        "properties": {
-          "coins": {
-            "type": "number"
-          },
-          "currency": {
-            "type": "string",
-            "enum": [
-              "MALO_COIN"
-            ]
-          },
-          "realMoney": {
-            "type": "boolean",
-            "enum": [
-              false
-            ]
-          }
-        },
-        "required": [
-          "coins",
-          "currency",
-          "realMoney"
-        ]
-      },
-      "Settings": {
-        "type": "object",
-        "properties": {
-          "pack": {
-            "$ref": "#/components/schemas/Pack"
-          },
-          "voiceSpeed": {
-            "type": "number",
-            "minimum": 0.5,
-            "maximum": 1.5
-          },
-          "subtitles": {
-            "type": "boolean"
-          },
-          "notifications": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "pack",
-          "voiceSpeed",
-          "subtitles",
-          "notifications"
-        ]
-      },
-      "Pack": {
-        "type": "string",
-        "enum": [
-          "ko",
-          "en"
-        ]
-      },
       "PlaySession": {
-        "type": [
-          "object",
-          "null"
-        ],
+        "type": "object",
         "properties": {
           "id": {
             "type": "string",
@@ -366,6 +143,13 @@
           "updatedAt"
         ]
       },
+      "Pack": {
+        "type": "string",
+        "enum": [
+          "ko",
+          "en"
+        ]
+      },
       "Emotion": {
         "type": "string",
         "enum": [
@@ -389,6 +173,312 @@
         "required": [
           "id",
           "text"
+        ]
+      },
+      "SessionResult": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "score": {
+            "type": "number"
+          },
+          "goodUtterances": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "text",
+                "reason"
+              ]
+            }
+          },
+          "improvableUtterances": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string"
+                },
+                "betterExpression": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "mistakeId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "text",
+                "betterExpression",
+                "reason",
+                "mistakeId"
+              ]
+            }
+          },
+          "rewardCoins": {
+            "type": "number"
+          },
+          "durationMs": {
+            "type": "number"
+          },
+          "nextSceneId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "sessionId",
+          "passed",
+          "score",
+          "goodUtterances",
+          "improvableUtterances",
+          "rewardCoins",
+          "durationMs",
+          "nextSceneId"
+        ]
+      },
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "retryable": {
+                "type": "boolean"
+              },
+              "requestId": {
+                "type": "string"
+              },
+              "details": {}
+            },
+            "required": [
+              "code",
+              "message",
+              "retryable",
+              "requestId"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "AuthSession": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "refreshToken": {
+            "type": "string"
+          },
+          "expiresIn": {
+            "type": "number"
+          },
+          "authProvider": {
+            "type": "string",
+            "enum": [
+              "demo",
+              "supabase"
+            ]
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          },
+          "migrated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "accessToken",
+          "refreshToken",
+          "expiresIn",
+          "authProvider",
+          "user",
+          "migrated"
+        ]
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "guest",
+              "member"
+            ]
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "isMock": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "displayName",
+          "email",
+          "isMock",
+          "createdAt"
+        ]
+      },
+      "Home": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/User"
+          },
+          "wallet": {
+            "$ref": "#/components/schemas/Wallet"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/Settings"
+          },
+          "resumeSession": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PlaySession"
+              },
+              {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "todayScene": {
+            "$ref": "#/components/schemas/Scene"
+          },
+          "otherScenes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Scene"
+            }
+          },
+          "celebration": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "days": {
+                "type": "number"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "days",
+              "message"
+            ]
+          }
+        },
+        "required": [
+          "user",
+          "wallet",
+          "settings",
+          "resumeSession",
+          "todayScene",
+          "otherScenes",
+          "celebration"
+        ]
+      },
+      "Wallet": {
+        "type": "object",
+        "properties": {
+          "coins": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "MALO_COIN"
+            ]
+          },
+          "realMoney": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          }
+        },
+        "required": [
+          "coins",
+          "currency",
+          "realMoney"
+        ]
+      },
+      "Settings": {
+        "type": "object",
+        "properties": {
+          "pack": {
+            "$ref": "#/components/schemas/Pack"
+          },
+          "voiceSpeed": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 1.5
+          },
+          "subtitles": {
+            "type": "boolean"
+          },
+          "notifications": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "pack",
+          "voiceSpeed",
+          "subtitles",
+          "notifications"
         ]
       },
       "Scene": {
@@ -667,7 +757,17 @@
             "$ref": "#/components/schemas/PlaySession"
           },
           "result": {
-            "$ref": "#/components/schemas/SessionResult"
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SessionResult"
+              },
+              {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            ]
           },
           "oopsMoment": {
             "type": "object",
@@ -701,92 +801,6 @@
           "result",
           "oopsMoment",
           "mistakeId"
-        ]
-      },
-      "SessionResult": {
-        "type": [
-          "object",
-          "null"
-        ],
-        "properties": {
-          "sessionId": {
-            "type": "string"
-          },
-          "passed": {
-            "type": "boolean"
-          },
-          "score": {
-            "type": "number"
-          },
-          "goodUtterances": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "text": {
-                  "type": "string"
-                },
-                "reason": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "text",
-                "reason"
-              ]
-            }
-          },
-          "improvableUtterances": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "text": {
-                  "type": "string"
-                },
-                "betterExpression": {
-                  "type": "string"
-                },
-                "reason": {
-                  "type": "string"
-                },
-                "mistakeId": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                }
-              },
-              "required": [
-                "text",
-                "betterExpression",
-                "reason",
-                "mistakeId"
-              ]
-            }
-          },
-          "rewardCoins": {
-            "type": "number"
-          },
-          "durationMs": {
-            "type": "number"
-          },
-          "nextSceneId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "sessionId",
-          "passed",
-          "score",
-          "goodUtterances",
-          "improvableUtterances",
-          "rewardCoins",
-          "durationMs",
-          "nextSceneId"
         ]
       },
       "AudioAsset": {
@@ -5382,7 +5396,7 @@
         }
       }
     },
-    "/api/v1/api/v1/audio/{assetId}": {
+    "/api/v1/audio/{assetId}": {
       "get": {
         "tags": [
           "Speech"

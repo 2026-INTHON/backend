@@ -92,6 +92,8 @@ test('Swagger, request validation, catalog and preview response contracts', asyn
   assert.equal((await request('/scenes?pack=en')).data.length, 12);
   const shop = (await request('/shop', undefined, auth.accessToken)).data; assert.equal(shop.previewOnly, true); assert.equal(shop.realBilling, false);
   const spec = app.getOpenAPI31Document(documentConfig); assert.ok(Object.keys(spec.paths || {}).length >= 35);
+  assert.ok(spec.paths?.['/api/v1/audio/{assetId}']); assert.ok(Object.keys(spec.paths || {}).every(path => !path.includes('/api/v1/api/v1')));
+  assert.equal((spec.components?.schemas?.PlaySession as { type: unknown }).type, 'object');
   assert.equal((await app.request('/api/v1/docs')).status, 200);
 });
 

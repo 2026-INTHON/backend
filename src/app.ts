@@ -35,6 +35,8 @@ app.onError((error, c) => {
 });
 app.notFound(c => c.json({ error: { code: 'NOT_FOUND', message: 'API 경로를 확인해 주세요.', retryable: false, requestId: c.get('requestId') } }, 404));
 app.openAPIRegistry.registerComponent('securitySchemes', 'BearerAuth', { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' });
+app.openAPIRegistry.register('PlaySession', C.Session);
+app.openAPIRegistry.register('SessionResult', C.Result);
 
 type Endpoint<I extends C.z.ZodType, O extends C.z.ZodType> = { method: 'get' | 'post' | 'patch' | 'delete'; path: string; tag: string; summary: string;
   input?: I; output: O; auth?: boolean; params?: C.z.ZodObject; query?: C.z.ZodObject; description?: string;
@@ -126,7 +128,7 @@ app.openapi(uploadRoute, async c => { const p = await Auth.authenticate(c.req.he
   const data = C.SpeechDraft.parse(await Game.transcribe(p.id, file, pack)); return c.json({ data, meta: { requestId: c.get('requestId'), apiVersion: 'v1' as const } }, 200); });
 app.get('/audio/:assetId', async c => { const assetId = c.req.param('assetId'); if (!/^a_[a-f0-9]{40}$/.test(assetId)) throw new ApiError('AUDIO_NOT_FOUND', '음성 파일을 찾지 못했어요.', 404);
   await Auth.verifyAudio(c.req.query('token') || '', assetId); c.header('Content-Type', 'audio/mpeg'); c.header('Referrer-Policy', 'no-referrer'); return c.body(await audioBytes(assetId)); });
-app.openAPIRegistry.registerPath({ method: 'get', path: '/api/v1/audio/{assetId}', tags: ['Speech'], summary: '10분 유효 서명 링크로 음성 재생', request: { params: z.object({ assetId: z.string() }), query: z.object({ token: z.string() }) }, responses: { 200: { description: 'MP3', content: { 'audio/mpeg': { schema: { type: 'string', format: 'binary' } } } } } });
+app.openAPIRegistry.registerPath({ method: 'get', path: '/audio/{assetId}', tags: ['Speech'], summary: '10분 유효 서명 링크로 음성 재생', request: { params: z.object({ assetId: z.string() }), query: z.object({ token: z.string() }) }, responses: { 200: { description: 'MP3', content: { 'audio/mpeg': { schema: { type: 'string', format: 'binary' } } } } } });
 endpoint({ method: 'get', path: '/mistakes', tag: 'Mistakes', summary: '자동 저장된 오답 도감', output: z.array(C.Mistake), run: (_, __, p) => [...p!.state.mistakes].reverse().map(Game.publicMistake) });
 endpoint({ method: 'get', path: '/mistakes/{id}', tag: 'Mistakes', summary: '내가 한 말·더 나은 말·이유', params: idParam, output: C.Mistake,
   run: (c, _, p) => { const m = p!.state.mistakes.find(m => m.id === c.req.param('id')); if (!m) throw new ApiError('MISTAKE_NOT_FOUND', '오답을 찾지 못했어요.', 404); return Game.publicMistake(m); } });
