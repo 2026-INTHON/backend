@@ -4,7 +4,7 @@ import type { MetricsValue } from './contracts';
 import { ApiError } from './errors';
 
 export const Grade = z.object({ outcome: z.enum(['correct', 'misunderstanding', 'clarify']), confidence: z.number().min(0).max(1), toneScore: z.number().min(0).max(100),
-  routeId:z.string().nullable().optional(),endingId:z.string().nullable().optional(),
+  npcReplySubtitle:z.string().default(''),routeId:z.string().nullable().optional(),endingId:z.string().nullable().optional(),
   native: z.boolean(),
   toneLabel: z.string(), feedback: z.string(), betterExpression: z.string(), reason: z.string(), npcReply: z.string(),
   action: z.string().trim().min(1).max(400), cues: z.array(Cue).min(1).max(5), views: z.array(Perspective).min(2).max(3),
@@ -24,7 +24,7 @@ export async function aiRequest(path: string, body?: unknown, form?: FormData) {
     throw new ApiError('AI_UNAVAILABLE', 'AI 연결에 실패했어요. 체력 차감 없이 다시 시도해 주세요.', 502, true);
   }
 }
-export async function evaluate(scenario: Scenario, node: SceneNode, text: string, mode: 'mock' | 'live', metrics: MetricsValue | null = null, history: { user: string; npc: string }[] = [], allowedRoutes:string[]=[], allowedEndings:string[]=[]) {
+export async function evaluate(scenario: Scenario, node: SceneNode, text: string, mode: 'mock' | 'live', metrics: MetricsValue | null = null, history: { user: string; npc: string }[] = [], allowedRoutes:string[]=[], allowedEndings:string[]=[],subtitleLanguage:string='en') {
   const support = learningSupport(scenario, node);
   if (mode === 'mock') {
     const bad = text === node.choices[2]?.text || /닥쳐|멍청|꺼져|니가 알아서|몰라요|싫어요|shut up|whatever/i.test(text);
@@ -40,7 +40,7 @@ export async function evaluate(scenario: Scenario, node: SceneNode, text: string
       emotion: bad ? 'confused' : unclear ? 'neutral' : 'happy', provider: 'mock', isMock: true });
   }
   const result = Grade.safeParse(await aiRequest('/v1/turns/evaluate', { mode, pack: scenario.pack, characterId: scenario.characterId, personalityId: scenario.personalityId,
-    situation: scenario.situation, node: { ...node, ...support }, text, history: history.slice(-4), audioMetrics: metrics,allowedRoutes,allowedEndings }));
+    situation: scenario.situation, node: { ...node, ...support }, text, history: history.slice(-4), audioMetrics: metrics,allowedRoutes,allowedEndings,subtitleLanguage }));
   if (!result.success) throw new ApiError('AI_RESPONSE_INVALID', 'AI 응답을 확인하지 못했어요. 체력 차감 없이 다시 시도해 주세요.', 502, true);
   const grade = result.data;
   // Language help is a retry, even if a provider incorrectly graded it as a clear mistake.

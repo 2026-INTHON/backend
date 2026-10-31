@@ -1,6 +1,7 @@
 import { z } from '@hono/zod-openapi';
 
 export { z };
+export const SubtitleLanguage=z.enum(['en','ja','zh','vi','es','id','ko']);
 export const Pack = z.enum(['ko', 'en']).openapi('Pack');
 export const Emotion = z.enum(['neutral', 'happy', 'confused', 'sad', 'angry']).openapi('Emotion');
 export const Settings = z.object({ pack: Pack, voiceSpeed: z.number().min(0.5).max(1.5), subtitles: z.boolean(), notifications: z.boolean() }).openapi('Settings');
@@ -28,14 +29,14 @@ export const Session = z.object({
   aiMode: z.enum(['mock', 'live']), status: z.enum(['active', 'paused', 'succeeded', 'failed', 'abandoned']),
   lives: z.number(), initialLives: z.number(), nodeIndex: z.number(), nodeCount: z.number(),
   briefing: z.object({ partner: z.string(), situation: z.string(), goal: z.string() }),
-  npc: z.object({ text: z.string(), emotion: Emotion, assetKey: z.string(), action: z.string().default(''), cues: z.array(Cue).default([]) }), choices: z.array(Choice),
+  npc: z.object({ subtitle:z.object({language:SubtitleLanguage,text:z.string()}).nullable().default(null),audioUrl:z.string().nullable().default(null),text: z.string(), emotion: Emotion, assetKey: z.string(), action: z.string().default(''), cues: z.array(Cue).default([]) }), choices: z.array(Choice),
   chapterId:z.string().nullable().default(null), backgroundUrl:z.string().nullable().default(null), branchId:z.string().nullable().default(null), hintsUsed: z.number(), createdAt: z.string(), updatedAt: z.string(),
 }).openapi('PlaySession');
 export const Turn = z.object({ id: z.string().uuid(), clientTurnId: z.string(), inputType: z.enum(['text', 'choice', 'voice']), text: z.string(),
   outcome: z.enum(['correct', 'misunderstanding', 'clarify']), confidence: z.number(), feedback: Feedback,
   nodeId: z.string().default(''), mark: z.enum(['O', '△', 'X']).optional(), native: z.boolean().default(false), attempt: z.number().int().min(1).default(1),
   comparison: z.object({ firstAnswer: z.string(), currentAnswer: z.string(), improved: z.boolean() }).nullable().default(null),
-  npcReply: z.string(), action: z.string().default(''), cues: z.array(Cue).default([]), emotion: Emotion, lifeDelta: z.number(), provider: z.string(), isMock: z.boolean(), createdAt: z.string(),
+  npcReplySubtitle:z.object({language:SubtitleLanguage,text:z.string()}).nullable().default(null),audioUrl:z.string().nullable().default(null), npcReply: z.string(), action: z.string().default(''), cues: z.array(Cue).default([]), emotion: Emotion, lifeDelta: z.number(), provider: z.string(), isMock: z.boolean(), createdAt: z.string(),
 }).openapi('Turn');
 export const Result = z.object({ sessionId: z.string(), passed: z.boolean(), score: z.number(),
   goodUtterances: z.array(z.object({ text: z.string(), reason: z.string() })),
