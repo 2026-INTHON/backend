@@ -11,6 +11,32 @@ export type CatalogChapter = C.z.infer<typeof C.Chapter> & {pack:'ko'|'en';sourc
 type Content<T>={id:string;kind:string;document:T};
 export const charMap:Record<string,string>={seoyun:'girlfriend',junho:'friend',boss:'manager',prof:'professor'};
 export const personaMap:Record<string,string>={tease:'playful',picky:'strict',calm:'calm'};
+// One reading order across generated curriculum and older demo/preview chapters.
+// IDs remain unchanged so saved progress and links still point to the same scenes.
+const chapterGuide:Record<string,{rank:number;title?:string;desc:string}>={
+ 'gf-1':{rank:1,desc:'이름과 관심사를 나누며 서로를 알아가요.'},
+ 'gf-2':{rank:2,desc:'메시지로 안부를 묻고 만날 시간과 장소를 정해요.'},
+ 'gf-3':{rank:3,desc:'함께 메뉴를 고르고 취향을 나누며 가까워져요.'},
+ 'fe-example-1':{rank:4,title:'첫 나들이',desc:'카페와 영화관에서 함께 시간을 보내요.'},
+ 'fe-example-2':{rank:5,desc:'주말 데이트를 계획하고 서로의 취향을 맞춰요.'},
+ 'gf-n':{rank:6,desc:'호감을 전하고 서로 원하는 관계를 확인해요.'},
+ 'ko-girlfriend':{rank:7,title:'연락과 서운함',desc:'연락이 늦어진 이유를 설명하고 서로의 마음을 살펴요.'},
+ 'fe-example-4':{rank:8,desc:'연인의 친구들과 인사하고 함께 대화를 나눠요.'},
+ 'fe-example-3':{rank:9,desc:'기념일을 챙기고 실수했을 때 진심을 전해요.'},
+ 'prof-1':{rank:1,desc:'자신을 소개하고 교수님께 정중하게 질문해요.'},
+ 'prof-2':{rank:2,desc:'이메일로 문의하고 답변에 감사와 확인을 전해요.'},
+ 'prof-3':{rank:3,desc:'과제 조건과 기한을 확인하고 피드백을 반영해요.'},
+ 'ko-professor':{rank:4,title:'과제 기한 조정하기',desc:'늦어진 이유와 새로운 제출 일정을 정중하게 전해요.'},
+ 'prof-n':{rank:5,desc:'관심 분야와 경험을 소개하며 연구 참여나 추천서를 부탁해요.'},
+};
+export function orderedChapters(chapters:CatalogChapter[]){
+ const rank=(c:CatalogChapter)=>c.source==='personal'?10000:c.pack==='ko'?(chapterGuide[c.id]?.rank??1000+c.no):c.no;
+ const counts:Record<string,number>={};
+ return [...chapters].sort((a,b)=>a.characterId.localeCompare(b.characterId)||rank(a)-rank(b)||a.id.localeCompare(b.id)).map(c=>{
+  const no=counts[c.characterId]=(counts[c.characterId]||0)+1,guide=c.pack==='ko'?chapterGuide[c.id]:undefined;
+  return {...c,no,displayLabel:`CH ${no}`,...(guide?{title:guide.title||c.title,desc:guide.desc}:{})};
+ });
+}
 export const curriculum = [
   {id:'gf-1',characterId:'girlfriend',no:1,title:'첫 만남에서 대화하기',place:'cafe',topics:[['자기소개','이름·나이·출신·관심사를 소개하기'],['호칭 정하기','씨·님·이름 부르기와 존댓말을 조율하기'],['자연스럽게 질문하기','취미나 일상 질문으로 대화 이어가기'],['친밀감 표현','상대 반응에 맞는 칭찬과 호감 표현']]},
   {id:'gf-2',characterId:'girlfriend',no:2,title:'카카오톡으로 약속 잡기',place:'cafe',topics:[['대화 시작','자연스러운 첫 메시지와 스몰토킹'],['약속 제안','~할래요·~어때요로 제안하기'],['애매한 답변 이해','시간 되면요·한번 봐요의 맥락과 불확실성을 확인하기'],['약속 확정','시간·장소 조율과 확인']]},
@@ -69,7 +95,7 @@ export async function scenes(pack:'ko'|'en',characterId?:string,personalityId?:s
 export async function chapters(p:Profile,pack:'ko'|'en',characterId?:string){
   await ensure();const all=(await rows<Content<CatalogChapter|{chapter:CatalogChapter}>>('malo_catalog',{kind:'chapter'})).map(r=>'chapter' in r.document?r.document.chapter:r.document);
   const own=await rows<{document:{chapter:CatalogChapter}}>('malo_user_chapters',{owner_id:p.id});all.push(...own.map(r=>r.document.chapter));
-  return all.filter(c=>c.pack===pack&&(!characterId||c.characterId===characterId)).sort((a,b)=>a.characterId.localeCompare(b.characterId)||a.no-b.no).map(ch=>{
+  return orderedChapters(all.filter(c=>c.pack===pack&&(!characterId||c.characterId===characterId))).map(ch=>{
    // Legacy chapters contain one story in three personalities, not three episodes.
    const legacy=ch.source==='examples'&&ch.id===`${ch.pack}-${ch.characterId}`;
    const subs=legacy?[ch.subs.find(s=>s.sceneId?.endsWith('-calm'))||ch.subs[0]].filter(Boolean):ch.subs;
