@@ -9,7 +9,12 @@ export const CharacterRender=z.object({assetKey:z.string(),characterId:z.string(
 export const Settings = z.object({ pack: Pack, voiceSpeed: z.number().min(0.5).max(1.5), subtitles: z.boolean(), notifications: z.boolean() }).openapi('Settings');
 export const User = z.object({ id: z.string().uuid(), kind: z.enum(['guest', 'member']), displayName: z.string(), email: z.string().nullable(), isMock: z.boolean(), createdAt: z.string() }).openapi('User');
 export const Auth = z.object({ accessToken: z.string(), refreshToken: z.string(), expiresIn: z.number(), authProvider: z.enum(['demo', 'supabase']), user: User, migrated: z.boolean() }).openapi('AuthSession');
-export const Personality = z.object({ id: z.string(), name: z.string(), description: z.string(), assetKey: z.string(), clientKey:z.string().optional(), short:z.string().optional(), level:z.string().optional() }).openapi('Personality');
+export const CharacterProfile = z.object({
+  age:z.string(),role:z.string(),occupation:z.string(),introduction:z.string(),relationship:z.string(),
+  values:z.array(z.string()),traits:z.array(z.string()),likes:z.array(z.string()),dislikes:z.array(z.string()),hobbies:z.array(z.string()),
+  speakingStyle:z.string(),sampleLines:z.array(z.string()),
+}).openapi('CharacterProfile');
+export const Personality = z.object({ id: z.string(), name: z.string(), description: z.string(), assetKey: z.string(), clientKey:z.string().optional(), short:z.string().optional(), level:z.string().optional(),profile:CharacterProfile.optional(),profileRevision:z.string().optional() }).openapi('Personality');
 export const Character = z.object({ id: z.string(), name: z.string(), role: z.string(), description: z.string(), emoji: z.string(), assetKey: z.string(), personalities: z.array(Personality), clientKey:z.string().optional(), call:z.string().optional(), free:z.boolean().optional(), imageUrl:z.string().optional(), cardUrl:z.string().optional() }).openapi('Character');
 export const Choice = z.object({ id: z.string(), text: z.string() }).openapi('Choice');
 export const Cue = z.object({ k: z.enum(['표정', '억양', '망설임', '침묵']), v: z.string().trim().min(1).max(400) }).openapi('NonverbalCue');
