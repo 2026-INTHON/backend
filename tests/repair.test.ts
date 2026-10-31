@@ -20,10 +20,12 @@ test('Repair persists, blocks checkpoints, accepts sufficient resolution once, a
    const bad=(await api(path+'/turns',body,token)).data;
    assert.equal(bad.session.repair.kind,'apology');assert.equal(bad.session.repair.resumeNpcText,start.npc.text);
    assert.equal(bad.session.lives,2);assert.equal(bad.session.nodeIndex,0);assert.deepEqual(bad.session.choices,[]);
+   assert.equal(bad.session.affect.stage,'hurt');assert.equal(bad.session.affect.strain,3);
    const requestCount=requests.length;
    assert.equal((await api(path+'/turns',body,token)).data.session.lives,2);assert.equal(requests.length,requestCount);
    await api(path+'/pause',{},token);await api(path+'/resume',{},token);
    assert.deepEqual((await api(path,undefined,token)).data.repair,bad.session.repair);
+   assert.deepEqual((await api(path,undefined,token)).data.affect,bad.session.affect);
    assert.equal((await api(path+'/turns',{clientTurnId:'choice',inputType:'choice',choiceId:'a'},token)).status,422);
    const hint=(await api(path+'/hint',{step:1},token)).data;assert.equal(hint.clue[0].v,bad.session.repair.issue);
    action='none';mark='O'; // Even an inconsistent AI response cannot silently erase repair.
@@ -34,8 +36,11 @@ test('Repair persists, blocks checkpoints, accepts sufficient resolution once, a
    const resolved=(await api(path+'/turns',{clientTurnId:'apology',inputType:'text',text:'무례하게 말해 죄송합니다. 제 잘못인데 화풀이했어요.'},token)).data;
    assert.equal(resolved.turn.mark,'O');assert.equal(resolved.turn.evaluation.goalAchieved,false);
    assert.equal(resolved.session.repair,null);assert.equal(resolved.session.nodeIndex,0);assert.equal(resolved.session.status,'active');
+   assert.equal(resolved.session.affect.strain,2);assert.equal(resolved.turn.emotion,'neutral');
+   assert.equal(requests.at(-1).affect.strain,3);
    const corrected=(await api(path+'/correction',{turnId:resolved.turn.id},token)).data;
    assert.equal(corrected.repair.kind,'apology');assert.equal(corrected.lives,2);
+   assert.equal(corrected.affect.strain,3);
    await api(path+'/turns',{clientTurnId:'apology-again',inputType:'text',text:'무례하게 말해 죄송합니다.'},token);
    action='none';
    const proper=(await api(path+'/turns',{clientTurnId:'proper',inputType:'text',text:'내일 오후까지 제출하겠습니다.'},token)).data;

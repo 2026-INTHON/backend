@@ -95,6 +95,8 @@ export async function googleExchange(accessToken: string, guest?: Profile) {
   return issue(target, migrated);
 }
 export async function signAudio(userId: string, assetId: string) { return sign(userId, { type: 'audio', assetId }, 600); }
+export async function signExport(userId:string,jobId:string){return sign(userId,{type:'export',jobId},600);}
+export async function verifyExport(token:string,jobId:string){const payload=await verify(token,'export');if(payload.jobId!==jobId)throw new ApiError('EXPORT_TOKEN_INVALID','파일 링크가 만료되었어요.',401);return payload.sub!;}
 export async function verifyAudio(token: string, assetId: string) {
   const payload = await verify(token, 'audio');
   if (payload.assetId !== assetId) throw new ApiError('AUDIO_TOKEN_INVALID', '음성 링크가 만료되었어요.', 401);

@@ -1,0 +1,21 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {recoverAffect,affectEmotion} from '../src/affect';
+test('Forgiveness holds a neutral or hurt expression; severity and personality control subsequent recovery',()=>{
+ const offense={repairAction:'request_apology',offenseSeverity:'serious' as const,emotion:'angry'};
+ const strict=recoverAffect(null,offense,'X','strict',false)!;
+ const playful=recoverAffect(null,offense,'X','playful',false)!;
+ assert.ok(strict.strain>playful.strain);
+ const apology={...offense,repairAction:'resolved',emotion:'happy'};
+ let a=recoverAffect(strict,apology,'O','strict',true)!;
+ assert.equal(a.stage,'guarded');assert.equal(affectEmotion(a),'angry');
+ assert.equal(affectEmotion(recoverAffect(playful,apology,'O','playful',true)!),'neutral');
+ assert.equal(recoverAffect(a,{...apology,repairAction:'continue'},'△','strict',true),a);
+ const good={...apology,repairAction:'none'};
+ a=recoverAffect(a,good,'O','strict',false)!;assert.equal(affectEmotion(a),'neutral');
+ a=recoverAffect(a,good,'O','strict',false)!;assert.equal(a.stage,'softening');
+ assert.equal(recoverAffect(a,good,'O','strict',false),null);
+ const severe=recoverAffect(null,{...offense,offenseSeverity:'severe',emotion:'sad'},'X','calm',false)!;
+ assert.equal(severe.emotion,'sad');assert.ok(severe.strain>strict.strain);
+ assert.equal(recoverAffect(severe,offense,'X','calm',true)!.strain,6);
+});

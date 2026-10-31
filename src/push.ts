@@ -18,7 +18,10 @@ export async function notifyCompleted(id:string){
   webpush.setVapidDetails(process.env.MALO_VAPID_SUBJECT||'https://inthon-demo-20261031-dh.koreacentral.cloudapp.azure.com',process.env.MALO_VAPID_PUBLIC_KEY!,process.env.MALO_VAPID_PRIVATE_KEY!);
   const subs=await rows<{id:string;subscription:webpush.PushSubscription}>('malo_push_subscriptions',{owner_id:j.owner_id});
   let failed=false;
-  for(const s of subs)try{await webpush.sendNotification(s.subscription,JSON.stringify({title:'Malo',body:j.kind==='report'?'학습 보고서가 준비됐어요.':'새 학습이 준비됐어요.',url:j.kind==='report'?'/result?sessionId='+encodeURIComponent((j.request as unknown as {sessionId:string}).sessionId):'/episodes?chapterId='+j.chapter_id,tag:j.id}),{TTL:86400,timeout:10000});}catch(e){const code=(e as {statusCode?:number}).statusCode;if(code===404||code===410)await removeSubscription(s.id,j.owner_id);else failed=true;}
+  const exported=j.request as unknown as {exportFormat?:string;language?:string};
+  const exportCopy:Record<string,string>={ko:'학습 파일이 준비됐어요. 결과 화면에서 저장해 주세요.',en:'Your practice file is ready. Save it from your results.',ja:'学習ファイルが完成しました。結果画面から保存できます。',zh:'学习文件已准备好，请到结果页面保存。'};
+  const body=exported.exportFormat?(exportCopy[exported.language||'en']||exportCopy.en):j.kind==='report'?'학습 보고서가 준비됐어요.':'새 학습이 준비됐어요.';
+  for(const s of subs)try{await webpush.sendNotification(s.subscription,JSON.stringify({title:'Malo',body,url:j.kind==='report'?'/result?sessionId='+encodeURIComponent((j.request as unknown as {sessionId:string}).sessionId):'/episodes?chapterId='+j.chapter_id,tag:j.id}),{TTL:86400,timeout:10000});}catch(e){const code=(e as {statusCode?:number}).statusCode;if(code===404||code===410)await removeSubscription(s.id,j.owner_id);else failed=true;}
   if(!failed)await patchJob(j.id,j.worker_token!,{notified_at:new Date().toISOString()});
 }
 export async function retryNotifications(){const ready=await rows<Job>('malo_generation_jobs',{status:'ready'});for(const j of ready.filter(j=>!j.notified_at&&j.owner_id).slice(0,20))await notifyCompleted(j.id).catch(()=>{});}
