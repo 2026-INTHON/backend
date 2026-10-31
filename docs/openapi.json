@@ -91,6 +91,21 @@
           "npc": {
             "type": "object",
             "properties": {
+              "gesture": {
+                "type": "string",
+                "enum": [
+                  "idle",
+                  "nod",
+                  "tilt",
+                  "thinking",
+                  "open_hand",
+                  "arms_crossed"
+                ],
+                "default": "idle"
+              },
+              "render": {
+                "$ref": "#/components/schemas/CharacterImageRender"
+              },
               "subtitle": {
                 "type": [
                   "object",
@@ -215,6 +230,56 @@
         "enum": [
           "ko",
           "en"
+        ]
+      },
+      "CharacterImageRender": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "assetKey": {
+            "type": "string"
+          },
+          "characterId": {
+            "type": "string"
+          },
+          "emotion": {
+            "$ref": "#/components/schemas/Emotion"
+          },
+          "gesture": {
+            "type": "string",
+            "enum": [
+              "idle",
+              "nod",
+              "tilt",
+              "thinking",
+              "open_hand",
+              "arms_crossed"
+            ]
+          },
+          "imageUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "requestedEmotion": {
+            "type": "string"
+          },
+          "requestedGesture": {
+            "type": "string"
+          }
+        },
+        "default": null,
+        "required": [
+          "assetKey",
+          "characterId",
+          "emotion",
+          "gesture",
+          "imageUrl",
+          "requestedEmotion",
+          "requestedGesture"
         ]
       },
       "Emotion": {
@@ -954,6 +1019,21 @@
               "currentAnswer",
               "improved"
             ]
+          },
+          "gesture": {
+            "type": "string",
+            "enum": [
+              "idle",
+              "nod",
+              "tilt",
+              "thinking",
+              "open_hand",
+              "arms_crossed"
+            ],
+            "default": "idle"
+          },
+          "render": {
+            "$ref": "#/components/schemas/CharacterImageRender"
           },
           "npcReplySubtitle": {
             "type": [
@@ -6698,6 +6778,18 @@
                               "minimum": 0,
                               "maximum": 100
                             },
+                            "gesture": {
+                              "type": "string",
+                              "enum": [
+                                "idle",
+                                "nod",
+                                "tilt",
+                                "thinking",
+                                "open_hand",
+                                "arms_crossed"
+                              ],
+                              "default": "idle"
+                            },
                             "npcReplySubtitle": {
                               "type": "string",
                               "default": ""
@@ -7991,6 +8083,203 @@
                       "required": [
                         "previewOnly",
                         "realBilling",
+                        "items"
+                      ]
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string"
+                        },
+                        "apiVersion": {
+                          "type": "string",
+                          "enum": [
+                            "v1"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "requestId",
+                        "apiVersion"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/assets/characters": {
+      "get": {
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "표정·몸짓 이미지 목록 — 미리 로드하고 render.assetKey로 전환",
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "renderMode": {
+                          "type": "string",
+                          "enum": [
+                            "image_variants"
+                          ]
+                        },
+                        "runtimeImageApiCalls": {
+                          "type": "boolean",
+                          "enum": [
+                            false
+                          ]
+                        },
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "assetKey": {
+                                "type": "string"
+                              },
+                              "characterId": {
+                                "type": "string"
+                              },
+                              "emotion": {
+                                "$ref": "#/components/schemas/Emotion"
+                              },
+                              "gesture": {
+                                "type": "string",
+                                "enum": [
+                                  "idle",
+                                  "nod",
+                                  "tilt",
+                                  "thinking",
+                                  "open_hand",
+                                  "arms_crossed"
+                                ]
+                              },
+                              "imageUrl": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "assetKey",
+                              "characterId",
+                              "emotion",
+                              "gesture",
+                              "imageUrl"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "renderMode",
+                        "runtimeImageApiCalls",
                         "items"
                       ]
                     },

@@ -1,10 +1,10 @@
-import { z, Cue, Perspective } from './contracts';
+import { z, Cue, Perspective, Gesture } from './contracts';
 import { characters, learningSupport, type Scenario, type SceneNode } from './catalog';
 import type { MetricsValue } from './contracts';
 import { ApiError } from './errors';
 
 export const Grade = z.object({ outcome: z.enum(['correct', 'misunderstanding', 'clarify']), confidence: z.number().min(0).max(1), toneScore: z.number().min(0).max(100),
-  npcReplySubtitle:z.string().default(''),routeId:z.string().nullable().optional(),endingId:z.string().nullable().optional(),
+  gesture:Gesture.default('idle'),npcReplySubtitle:z.string().default(''),routeId:z.string().nullable().optional(),endingId:z.string().nullable().optional(),
   native: z.boolean(),
   toneLabel: z.string(), feedback: z.string(), betterExpression: z.string(), reason: z.string(), npcReply: z.string(),
   action: z.string().trim().min(1).max(400), cues: z.array(Cue).min(1).max(5), views: z.array(Perspective).min(2).max(3),
