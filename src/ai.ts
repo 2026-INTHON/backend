@@ -5,7 +5,7 @@ import type { MetricsValue } from './contracts';
 import { ApiError } from './errors';
 
 export const Grade = z.object({ outcome: z.enum(['correct', 'misunderstanding', 'clarify']), confidence: z.number().min(0).max(1), toneScore: z.number().min(0).max(100),
-  evaluationMark:z.enum(['O','△','X','?']).nullable().default(null),reaction:z.enum(['happy','neutral','angry','sad','confused']).nullable().default(null),goalAchieved:z.boolean().nullable().default(null),reasonSubtitle:z.string().default(''),gesture:Gesture.default('idle'),npcReplySubtitle:z.string().default(''),routeId:z.string().nullable().optional(),endingId:z.string().nullable().optional(),
+  imageAssetKey:z.string().nullable().default(null),evaluationMark:z.enum(['O','△','X','?']).nullable().default(null),reaction:z.enum(['happy','neutral','angry','sad','confused']).nullable().default(null),goalAchieved:z.boolean().nullable().default(null),reasonSubtitle:z.string().default(''),gesture:Gesture.default('idle'),npcReplySubtitle:z.string().default(''),routeId:z.string().nullable().optional(),endingId:z.string().nullable().optional(),
   native: z.boolean(),
   toneLabel: z.string(), feedback: z.string(), betterExpression: z.string(), reason: z.string(), npcReply: z.string(),
   action: z.string().trim().min(1).max(400), cues: z.array(Cue).min(1).max(5), views: z.array(Perspective).min(2).max(3),
@@ -25,7 +25,7 @@ export async function aiRequest(path: string, body?: unknown, form?: FormData) {
     throw new ApiError('AI_UNAVAILABLE', 'AI 연결에 실패했어요. 체력 차감 없이 다시 시도해 주세요.', 502, true);
   }
 }
-export async function evaluate(scenario: Scenario, node: SceneNode, text: string, mode: 'mock' | 'live', metrics: MetricsValue | null = null, history: { user: string; npc: string }[] = [], allowedRoutes:string[]=[], allowedEndings:string[]=[],subtitleLanguage:string='en') {
+export async function evaluate(scenario: Scenario, node: SceneNode, text: string, mode: 'mock' | 'live', metrics: MetricsValue | null = null, history: { user: string; npc: string }[] = [], allowedRoutes:string[]=[], allowedEndings:string[]=[],subtitleLanguage:string='en',imageOptions:unknown[]=[] ) {
   const support = learningSupport(scenario, node);
   if (mode === 'mock') {
     const bad = text === node.choices[2]?.text || /닥쳐|멍청|꺼져|니가 알아서|몰라요|싫어요|shut up|whatever/i.test(text);
@@ -41,14 +41,20 @@ export async function evaluate(scenario: Scenario, node: SceneNode, text: string
       emotion: bad ? 'confused' : unclear ? 'neutral' : 'happy', provider: 'mock', isMock: true });
   }
   const result = Grade.safeParse(await aiRequest('/v1/turns/evaluate', { mode, pack: scenario.pack, characterId: scenario.characterId, personalityId: scenario.personalityId,
-    situation: scenario.situation, node: { ...node, ...support }, text, history: history.slice(-4), audioMetrics: metrics,allowedRoutes,allowedEndings,subtitleLanguage }));
+    situation: scenario.situation, node: { ...node, ...support }, text, history: history.slice(-4), audioMetrics: metrics,allowedRoutes,allowedEndings,subtitleLanguage,imageOptions }));
   if (!result.success) throw new ApiError('AI_RESPONSE_INVALID', 'AI 응답을 확인하지 못했어요. 체력 차감 없이 다시 시도해 주세요.', 502, true);
   const grade = result.data;
   // Language help is a retry, even if a provider incorrectly graded it as a clear mistake.
-  if (grade.native || isOtherLanguage(text, scenario.pack)) grade.native=true;
+  grade.native=needsLanguageHelp(text,scenario.pack,grade.native);
   const assessment=assess({...grade,subtitleLanguage});
   if(assessment.progression==='advance'&&((allowedRoutes.length&&!allowedRoutes.includes(grade.routeId||''))||(allowedEndings.length&&!allowedEndings.includes(grade.endingId||''))))throw new ApiError('STORY_ROUTE_INVALID','이야기 반응을 확인하지 못했어요. 체력 차감 없이 다시 시도해 주세요.',502,true);
   return {...grade,evaluationMark:assessment.mark,outcome:assessment.outcome,reason:assessment.reason,reasonSubtitle:assessment.reasonSubtitle};
+}
+export function needsLanguageHelp(text:string,pack:'ko'|'en',suggested:boolean){
+  const letters=[...text].filter(c=>/\p{L}/u.test(c));
+  const hangul=letters.filter(c=>/[\uac00-\ud7a3\u1100-\u11ff\u3130-\u318f]/u.test(c)).length;
+  if(pack==='ko'&&letters.length&&hangul/letters.length>=.6)return false;
+  return suggested||isOtherLanguage(text,pack);
 }
 export function isOtherLanguage(text: string, pack: 'ko' | 'en') {
   if (!/\p{L}/u.test(text)) return false;
