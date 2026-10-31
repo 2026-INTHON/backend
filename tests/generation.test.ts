@@ -46,3 +46,14 @@ test('DB character data is the read source and push endpoints reject private-net
  assert.equal((await api('/characters')).data.find((c:{id:string})=>c.id==='friend').name,'DB 변경 이름');
  assert.equal((await api('/notifications/push/subscriptions',{endpoint:'https://127.0.0.1/push',keys:{p256dh:'x'.repeat(40),auth:'x'.repeat(24)}},token)).status,422);
 });
+test('A failed generation retries from its saved lesson and remains private',async()=>{
+ const a=(await api('/auth/guest',{})).data,b=(await api('/auth/guest',{})).data;
+ const j=(await api('/chapter-generations',{clientRequestId:randomUUID(),prompt:'교수님과 처음 대화하기',characterId:'professor',personalityId:'calm',lessonCount:2},a.accessToken)).data;
+ const real=globalThis.fetch;let broken=true;const indexes:number[]=[];
+ globalThis.fetch=async(url,init)=>{if(String(url).endsWith('/outline'))return Response.json({outline});const i=JSON.parse(init!.body as string).index;indexes.push(i);if(broken&&i===1)return Response.json({error:{code:'AI_UNAVAILABLE',message:'다시 시도',retryable:true}},{status:502});return Response.json({lesson:lesson()});};
+ try{for(let i=0;i<4;i++)await workOne();assert.equal((await api('/chapter-generations/'+j.id,undefined,a.accessToken)).data.status,'failed');
+  assert.equal((await api('/chapter-generations/'+j.id+'/retry',{},b.accessToken)).status,404);
+  broken=false;assert.equal((await api('/chapter-generations/'+j.id+'/retry',{},a.accessToken)).data.status,'queued');
+  for(let i=0;i<3;i++)await workOne();assert.equal((await api('/chapter-generations/'+j.id,undefined,a.accessToken)).data.status,'ready');assert.equal(indexes.filter(i=>i===0).length,1);
+ }finally{globalThis.fetch=real;}
+});

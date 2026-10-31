@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { aiRequest } from './ai';
-import { rows, put, claimJob, patchJob, publishChapter } from './content-db';
+import { rows, put, claimJob, patchJob, publishChapter, retryJob } from './content-db';
 import { persona, curriculum, type CatalogChapter } from './content';
 import { ChapterInput, Outline, Lesson, type ChapterRequest, type Job } from './generation-contracts';
 import type { Scenario } from './catalog';
@@ -12,6 +12,7 @@ const fingerprint=(request:ChapterRequest)=>{const {persona:_,...input}=request;
 export const jobView=(j:Job)=>({id:j.id,label:j.checkpoint.outline?.title||j.request.prompt.slice(0,60),characterId:j.request.characterId,personalityId:j.request.personalityId,status:j.status,stage:j.stage,chapterId:j.chapter_id,error:j.error,createdAt:j.created_at,updatedAt:j.updated_at});
 export async function jobs(owner:string){return (await rows<Job>('malo_generation_jobs',{owner_id:owner},'created_at.desc')).map(jobView);}
 export async function job(owner:string,id:string){const j=(await rows<Job>('malo_generation_jobs',{id,owner_id:owner}))[0];if(!j)throw new ApiError('JOB_NOT_FOUND','생성 작업을 찾지 못했어요.',404);return jobView(j);}
+export async function retry(owner:string,id:string){const j=(await rows<Job>('malo_generation_jobs',{id,owner_id:owner}))[0];if(!j)throw new ApiError('JOB_NOT_FOUND','생성 작업을 찾지 못했어요.',404);if(j.error?.code==='CONTENT_NOT_ALLOWED')throw new ApiError('CONTENT_NOT_ALLOWED','내용을 수정해 새로 생성해 주세요.',422);if(j.status==='failed')await retryJob(id,owner);return job(owner,id);}
 async function enqueue(owner:string|null,request:ChapterRequest) {
   const hash=fingerprint(request);
   const filters:Record<string,string>=owner?{owner_id:owner,client_request_id:request.clientRequestId}:{request_key:'catalog:'+request.catalogId};
@@ -38,7 +39,7 @@ export async function workOne(){
   try{
     if(!cp.outline){const r=await aiRequest('/v1/chapters/outline',request);cp.outline=Outline.parse(r.outline);if(cp.outline.lessons.length!==j.request.lessonCount)throw new ApiError('OUTLINE_INVALID','챕터 구성을 확인하지 못했어요.',502,true);}
     else if((cp.lessons?.length||0)<j.request.lessonCount){const r=await aiRequest('/v1/chapters/lesson',{request,outline:cp.outline,index:cp.lessons?.length||0});(cp.lessons??=[]).push(Lesson.parse(r.lesson));}
-    else if(!cp.backgroundUrl){const curated:Record<string,string>={'gf-1':'commonroom','gf-2':'study'};const existing=curated[j.request.catalogId||'']||cp.outline.existingBackground;cp.backgroundUrl=existing==='new'?`/api/v1/images/${(await aiRequest('/v1/chapters/background',{description:cp.outline.background})).assetId}`:`/api/v1/catalog-assets/bg-${existing}.png`;}
+    else if(!cp.backgroundUrl){const curated:Record<string,string>={'gf-1':'commonroom','gf-2':'study','prof-2':'office','prof-3':'office'};const existing=curated[j.request.catalogId||'']||cp.outline.existingBackground;cp.backgroundUrl=existing==='new'?`/api/v1/images/${(await aiRequest('/v1/chapters/background',{description:cp.outline.background})).assetId}`:`/api/v1/catalog-assets/bg-${existing}.png`;}
     else {
       const chapterId=j.request.catalogId||j.id;
       const scenarios:Record<string,Scenario>={};

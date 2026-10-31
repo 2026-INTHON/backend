@@ -24,6 +24,11 @@ export async function patchJob(id:string, worker:string, update:Row) {
   const keys=Object.keys(update); const values=keys.map(k=>encoded.has(k)&&update[k]!=null?JSON.stringify(update[k]):update[k]) as (string|number|null)[];
   return !!sqlite().prepare(`UPDATE malo_generation_jobs SET ${keys.map(k=>`${k}=?`).join(',')} WHERE id=? AND worker_token=?`).run(...values,id,worker).changes;
 }
+export async function retryJob(id:string,owner:string){
+  const update={status:'queued',stage:'retrying',error:null,attempts:0,worker_token:null,lease_until:null,updated_at:new Date().toISOString()};
+  if(dataMode()==='supabase'){await rest(`malo_generation_jobs?id=eq.${id}&owner_id=eq.${owner}&status=eq.failed`,{method:'PATCH',body:JSON.stringify(update)});return;}
+  sqlite().prepare("UPDATE malo_generation_jobs SET status='queued',stage='retrying',error=NULL,attempts=0,worker_token=NULL,lease_until=NULL,updated_at=? WHERE id=? AND owner_id=? AND status='failed'").run(update.updated_at,id,owner);
+}
 export async function claimJob(worker:string):Promise<Job|null> {
   if(dataMode()==='supabase') return (await rest('rpc/malo_claim_generation_job',{method:'POST',body:JSON.stringify({worker})}))?.[0]??null;
   const db=sqlite(), now=new Date().toISOString();

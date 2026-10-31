@@ -45,6 +45,7 @@ export async function evaluate(scenario: Scenario, node: SceneNode, text: string
   const grade = result.data;
   // Language help is a retry, even if a provider incorrectly graded it as a clear mistake.
   if (grade.native || isOtherLanguage(text, scenario.pack)) return { ...grade, native: true, outcome: 'clarify' as const };
+  if(grade.outcome==='correct'&&((allowedRoutes.length&&!allowedRoutes.includes(grade.routeId||''))||(allowedEndings.length&&!allowedEndings.includes(grade.endingId||''))))throw new ApiError('STORY_ROUTE_INVALID','이야기 반응을 확인하지 못했어요. 체력 차감 없이 다시 시도해 주세요.',502,true);
   return grade;
 }
 export function isOtherLanguage(text: string, pack: 'ko' | 'en') {
