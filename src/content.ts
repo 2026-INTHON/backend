@@ -54,7 +54,12 @@ export async function seedCatalog() {
 }
 let boot:Promise<void>|undefined;
 async function ensure(){ if((await rows('malo_catalog',{kind:'character'})).length)return; boot??=seedCatalog().finally(()=>{boot=undefined;});await boot; }
-export async function characters(){await ensure();return (await rows<Content<CatalogCharacter>>('malo_catalog',{kind:'character'})).map(r=>r.document);}
+export async function characters(){await ensure();return (await rows<Content<CatalogCharacter>>('malo_catalog',{kind:'character'})).map(({document:c})=>({...c,personalities:c.personalities.map(p=>{
+  if(c.id==='professor'&&p.id==='playful')return {...p,name:'친절',short:'따뜻하게 격려하며 이야기를 들어요',description:'편안하게 질문하도록 도와주며, 가벼운 유머를 곁들여 설명해요.'};
+  if(c.id==='professor'&&p.id==='calm')return {...p,name:'기본'};
+  if(c.id==='girlfriend'&&p.id==='playful')return {...p,name:'발랄'};
+  return p;
+})}));}
 export async function scene(id:string,owner?:string):Promise<Scenario|null>{
   await ensure();const publicRow=(await rows<Content<Scenario>>('malo_catalog',{id,kind:'scene'}))[0];if(publicRow)return publicRow.document;
   for(const c of await rows<Content<{chapter:CatalogChapter;scenarios?:Record<string,Scenario>}>>('malo_catalog',{kind:'chapter'}))if(c.document.scenarios?.[id])return c.document.scenarios[id];
@@ -65,9 +70,13 @@ export async function scenes(pack:'ko'|'en',characterId?:string,personalityId?:s
 export async function chapters(p:Profile,pack:'ko'|'en',characterId?:string){
   await ensure();const all=(await rows<Content<CatalogChapter|{chapter:CatalogChapter}>>('malo_catalog',{kind:'chapter'})).map(r=>'chapter' in r.document?r.document.chapter:r.document);
   const own=await rows<{document:{chapter:CatalogChapter}}>('malo_user_chapters',{owner_id:p.id});all.push(...own.map(r=>r.document.chapter));
-  return all.filter(c=>c.pack===pack&&(!characterId||c.characterId===characterId)).sort((a,b)=>a.characterId.localeCompare(b.characterId)||a.no-b.no).map(ch=>({...ch,subs:ch.subs.map(s=>{
-    const plays=p.state.plays.filter(play=>play.sceneId===s.sceneId);const done=plays.filter(play=>play.status==='succeeded');
+  return all.filter(c=>c.pack===pack&&(!characterId||c.characterId===characterId)).sort((a,b)=>a.characterId.localeCompare(b.characterId)||a.no-b.no).map(ch=>{
+   // Legacy chapters contain one story in three personalities, not three episodes.
+   const legacy=ch.source==='examples'&&ch.id===`${ch.pack}-${ch.characterId}`;
+   const subs=legacy?[ch.subs.find(s=>s.sceneId?.endsWith('-calm'))||ch.subs[0]].filter(Boolean):ch.subs;
+   return {...ch,subs:subs.map(s=>{
+    const plays=p.state.plays.filter(play=>legacy?ch.subs.some(v=>v.sceneId===play.sceneId):play.sceneId===s.sceneId);const done=plays.filter(play=>play.status==='succeeded');
     return {...s,state:s.availability!=='ready'?'locked':done.length?'done':plays.some(play=>['active','paused'].includes(play.status))?'now':'open',score:done.length?Math.max(...done.map(play=>play.result?.score||0)):null};
-  })}));
+  })};});
 }
 export async function persona(characterId:string,personalityId:string){const c=(await characters()).find(c=>c.id===characterId);const p=c?.personalities.find(p=>p.id===personalityId);if(!c||!p)throw new ApiError('PERSONA_NOT_FOUND','캐릭터와 성격을 확인해 주세요.',422);return {...c,personalities:undefined,personality:p};}
