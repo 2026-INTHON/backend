@@ -5,7 +5,7 @@ import type { MetricsValue } from './contracts';
 import { ApiError } from './errors';
 
 export const Grade = z.object({ outcome: z.enum(['correct', 'misunderstanding', 'clarify']), confidence: z.number().min(0).max(1), toneScore: z.number().min(0).max(100),
-  reaction:z.enum(['happy','neutral','angry','sad','confused']).nullable().default(null),goalAchieved:z.boolean().nullable().default(null),reasonSubtitle:z.string().default(''),gesture:Gesture.default('idle'),npcReplySubtitle:z.string().default(''),routeId:z.string().nullable().optional(),endingId:z.string().nullable().optional(),
+  evaluationMark:z.enum(['O','△','X','?']).nullable().default(null),reaction:z.enum(['happy','neutral','angry','sad','confused']).nullable().default(null),goalAchieved:z.boolean().nullable().default(null),reasonSubtitle:z.string().default(''),gesture:Gesture.default('idle'),npcReplySubtitle:z.string().default(''),routeId:z.string().nullable().optional(),endingId:z.string().nullable().optional(),
   native: z.boolean(),
   toneLabel: z.string(), feedback: z.string(), betterExpression: z.string(), reason: z.string(), npcReply: z.string(),
   action: z.string().trim().min(1).max(400), cues: z.array(Cue).min(1).max(5), views: z.array(Perspective).min(2).max(3),
@@ -15,7 +15,7 @@ export async function aiRequest(path: string, body?: unknown, form?: FormData) {
   try {
     const response = await fetch(process.env.MALO_AI_URL.replace(/\/$/, '') + path, {
       method: 'POST', headers: { 'X-AI-Service-Token': process.env.MALO_AI_SERVICE_TOKEN || '', ...(form ? {} : { 'Content-Type': 'application/json' }) },
-      body: form || JSON.stringify(body), signal: AbortSignal.timeout(path.startsWith('/v1/chapters/')?240000:95000),
+      body: form || JSON.stringify(body), signal: AbortSignal.timeout((path.startsWith('/v1/chapters/')||path.startsWith('/v1/reports/'))?240000:95000),
     });
     const data = await response.json();
     if (!response.ok) throw new ApiError(data.error?.code || 'AI_UNAVAILABLE', data.error?.message || 'AI 연결에 실패했어요. 다시 시도해 주세요.', response.status, data.error?.retryable ?? true);
@@ -45,9 +45,10 @@ export async function evaluate(scenario: Scenario, node: SceneNode, text: string
   if (!result.success) throw new ApiError('AI_RESPONSE_INVALID', 'AI 응답을 확인하지 못했어요. 체력 차감 없이 다시 시도해 주세요.', 502, true);
   const grade = result.data;
   // Language help is a retry, even if a provider incorrectly graded it as a clear mistake.
-  if (grade.native || isOtherLanguage(text, scenario.pack)) return { ...grade, native: true, outcome: 'clarify' as const };
-  if(assess(grade).progression==='advance'&&((allowedRoutes.length&&!allowedRoutes.includes(grade.routeId||''))||(allowedEndings.length&&!allowedEndings.includes(grade.endingId||''))))throw new ApiError('STORY_ROUTE_INVALID','이야기 반응을 확인하지 못했어요. 체력 차감 없이 다시 시도해 주세요.',502,true);
-  return grade;
+  if (grade.native || isOtherLanguage(text, scenario.pack)) grade.native=true;
+  const assessment=assess({...grade,subtitleLanguage});
+  if(assessment.progression==='advance'&&((allowedRoutes.length&&!allowedRoutes.includes(grade.routeId||''))||(allowedEndings.length&&!allowedEndings.includes(grade.endingId||''))))throw new ApiError('STORY_ROUTE_INVALID','이야기 반응을 확인하지 못했어요. 체력 차감 없이 다시 시도해 주세요.',502,true);
+  return {...grade,evaluationMark:assessment.mark,outcome:assessment.outcome,reason:assessment.reason,reasonSubtitle:assessment.reasonSubtitle};
 }
 export function isOtherLanguage(text: string, pack: 'ko' | 'en') {
   if (!/\p{L}/u.test(text)) return false;

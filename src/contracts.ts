@@ -26,22 +26,24 @@ export const Feedback = z.object({
   hesitation: z.object({ pauseCount: z.number(), fillerCount: z.number(), estimated: z.boolean(), note: z.string() }).nullable(),
   message: z.string(), betterExpression: z.string(), reason: z.string(), views: z.array(Perspective).max(3).default([]),
 }).openapi('TurnFeedback');
+export const Briefing=z.object({title:z.string().default(''),partner:z.string(),situation:z.string(),goal:z.string(),translation:z.object({language:SubtitleLanguage,title:z.string(),partner:z.string(),situation:z.string(),goal:z.string()}).nullable().default(null)}).openapi('SubchapterBriefing');
 export const Session = z.object({
   id: z.string().uuid(), sceneId: z.string(), characterId: z.string(), personalityId: z.string(), pack: Pack,
   aiMode: z.enum(['mock', 'live']), status: z.enum(['active', 'paused', 'succeeded', 'failed', 'abandoned']),
   lives: z.number(), initialLives: z.number(), nodeIndex: z.number(), nodeCount: z.number(),
-  briefing: z.object({ partner: z.string(), situation: z.string(), goal: z.string() }),
+  briefing:Briefing,
   npc: z.object({gesture:Gesture.default('idle'),render:CharacterRender.nullable().default(null), subtitle:z.object({language:SubtitleLanguage,text:z.string()}).nullable().default(null),audioUrl:z.string().nullable().default(null),text: z.string(), emotion: Emotion, assetKey: z.string(), action: z.string().default(''), cues: z.array(Cue).default([]) }), choices: z.array(Choice),
   chapterId:z.string().nullable().default(null), backgroundUrl:z.string().nullable().default(null), branchId:z.string().nullable().default(null), hintsUsed: z.number(), createdAt: z.string(), updatedAt: z.string(),
 }).openapi('PlaySession');
-export const ReactionEvaluation=z.object({reaction:Emotion,label:z.string(),reason:z.string(),reasonSubtitle:z.object({language:SubtitleLanguage,text:z.string()}).nullable(),goalAchieved:z.boolean(),progression:z.enum(['advance','retry']),policyVersion:z.literal('reaction-v1-draft'),provisional:z.literal(true)}).openapi('ReactionEvaluation');
+export const ReactionEvaluation=z.object({mark:z.enum(['O','△','X','?']),category:z.enum(['excellent','acceptable','inappropriate','off_topic']),label:z.string(),reason:z.string(),reasonSubtitle:z.object({language:SubtitleLanguage,text:z.string()}).nullable(),goalAchieved:z.boolean(),progression:z.enum(['advance','retry']),policyVersion:z.enum(['reaction-v1-draft','judgment-v2-draft']),provisional:z.literal(true)}).openapi('ReactionEvaluation');
 export const Turn = z.object({ id: z.string().uuid(), clientTurnId: z.string(), inputType: z.enum(['text', 'choice', 'voice']), text: z.string(),
   outcome: z.enum(['correct', 'misunderstanding', 'clarify']), confidence: z.number(), feedback: Feedback,
-  nodeId: z.string().default(''), mark: z.enum(['O', '△', 'X']).optional(), native: z.boolean().default(false), attempt: z.number().int().min(1).default(1),
+  nodeId: z.string().default(''), mark: z.enum(['O', '△', 'X','?']).optional(), native: z.boolean().default(false), attempt: z.number().int().min(1).default(1),
   comparison: z.object({ firstAnswer: z.string(), currentAnswer: z.string(), improved: z.boolean() }).nullable().default(null),
   evaluation:ReactionEvaluation.nullable().default(null),gesture:Gesture.default('idle'),render:CharacterRender.nullable().default(null), npcReplySubtitle:z.object({language:SubtitleLanguage,text:z.string()}).nullable().default(null),audioUrl:z.string().nullable().default(null), npcReply: z.string(), action: z.string().default(''), cues: z.array(Cue).default([]), emotion: Emotion, lifeDelta: z.number(), provider: z.string(), isMock: z.boolean(), createdAt: z.string(),
 }).openapi('Turn');
-export const Result = z.object({ sessionId: z.string(), passed: z.boolean(), score: z.number(),
+export const ReportMeta=z.object({reportId:z.string().uuid(),status:z.enum(['queued','running','ready','failed'])});
+export const Result = z.object({ sessionId: z.string(), report:ReportMeta.nullable().default(null),passed: z.boolean(), score: z.number(),
   goodUtterances: z.array(z.object({ text: z.string(), reason: z.string() })),
   improvableUtterances: z.array(z.object({ text: z.string(), betterExpression: z.string(), reason: z.string(), mistakeId: z.string().nullable() })),
   ending:z.object({id:z.string(),kind:z.enum(['happy','bad']),title:z.string(),text:z.string()}).nullable().default(null), rewardCoins: z.number(), durationMs: z.number(), nextSceneId: z.string().nullable(),

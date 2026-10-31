@@ -98,7 +98,7 @@ test('Live AI metadata reaches the API and language or low-confidence mistakes n
     assert.equal(native.turn.provider, 'lablup'); assert.equal(native.turn.cues[0].k, '침묵');
     confidence = 0.5;
     const vague = (await request(`/sessions/${s.id}/turns`, { clientTurnId: 'vague', inputType: 'text', text: '내일쯤 할게요.' }, a.accessToken)).data;
-    assert.equal(vague.turn.native, false); assert.equal(vague.turn.mark, '△'); assert.equal(vague.turn.lifeDelta, 0);
+    assert.equal(vague.turn.native, false); assert.equal(vague.turn.mark, '?'); assert.equal(vague.turn.lifeDelta, 0);
     assert.equal(vague.session.nodeIndex, 0); assert.equal(vague.session.lives, 3);
   } finally { globalThis.fetch = oldFetch; if (oldUrl) process.env.MALO_AI_URL = oldUrl; else delete process.env.MALO_AI_URL; }
 });

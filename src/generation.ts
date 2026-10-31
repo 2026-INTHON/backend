@@ -1,3 +1,4 @@
+import {processReport} from './reports';
 import { createHash, randomUUID } from 'node:crypto';
 import { aiRequest } from './ai';
 import { rows, put, claimJob, patchJob, publishChapter, retryJob } from './content-db';
@@ -10,15 +11,15 @@ import { notifyCompleted } from './push';
 const now=()=>new Date().toISOString();
 const fingerprint=(request:ChapterRequest)=>{const {persona:_,...input}=request;return createHash('sha256').update(JSON.stringify(input)).digest('hex');};
 export const jobView=(j:Job)=>({id:j.id,label:j.checkpoint.outline?.title||j.request.prompt.slice(0,60),characterId:j.request.characterId,personalityId:j.request.personalityId,status:j.status,stage:j.stage,chapterId:j.chapter_id,error:j.error,createdAt:j.created_at,updatedAt:j.updated_at});
-export async function jobs(owner:string){return (await rows<Job>('malo_generation_jobs',{owner_id:owner},'created_at.desc')).map(jobView);}
-export async function job(owner:string,id:string){const j=(await rows<Job>('malo_generation_jobs',{id,owner_id:owner}))[0];if(!j)throw new ApiError('JOB_NOT_FOUND','생성 작업을 찾지 못했어요.',404);return jobView(j);}
-export async function retry(owner:string,id:string){const j=(await rows<Job>('malo_generation_jobs',{id,owner_id:owner}))[0];if(!j)throw new ApiError('JOB_NOT_FOUND','생성 작업을 찾지 못했어요.',404);if(j.error?.code==='CONTENT_NOT_ALLOWED')throw new ApiError('CONTENT_NOT_ALLOWED','내용을 수정해 새로 생성해 주세요.',422);if(j.status==='failed')await retryJob(id,owner);return job(owner,id);}
+export async function jobs(owner:string){return (await rows<Job>('malo_generation_jobs',{owner_id:owner,kind:'personal'},'created_at.desc')).map(jobView);}
+export async function job(owner:string,id:string){const j=(await rows<Job>('malo_generation_jobs',{id,owner_id:owner,kind:'personal'}))[0];if(!j)throw new ApiError('JOB_NOT_FOUND','생성 작업을 찾지 못했어요.',404);return jobView(j);}
+export async function retry(owner:string,id:string){const j=(await rows<Job>('malo_generation_jobs',{id,owner_id:owner,kind:'personal'}))[0];if(!j)throw new ApiError('JOB_NOT_FOUND','생성 작업을 찾지 못했어요.',404);if(j.error?.code==='CONTENT_NOT_ALLOWED')throw new ApiError('CONTENT_NOT_ALLOWED','내용을 수정해 새로 생성해 주세요.',422);if(j.status==='failed')await retryJob(id,owner);return job(owner,id);}
 async function enqueue(owner:string|null,request:ChapterRequest) {
   const hash=fingerprint(request);
   const filters:Record<string,string>=owner?{owner_id:owner,client_request_id:request.clientRequestId}:{request_key:'catalog:'+request.catalogId};
   const existing=(await rows<Job>('malo_generation_jobs',filters))[0];
   if(existing){if(fingerprint(existing.request)!==hash)throw new ApiError('IDEMPOTENCY_CONFLICT','같은 요청 ID에는 같은 내용만 보낼 수 있어요.',409);return jobView(existing);}
-  if(owner){const mine=await rows<Job>('malo_generation_jobs',{owner_id:owner});if(mine.filter(j=>['running','queued'].includes(j.status)).length>=3||mine.filter(j=>j.created_at.slice(0,10)===now().slice(0,10)).length>=5)throw new ApiError('GENERATION_LIMIT','시연용 생성 한도에 도달했어요. 진행 중인 작업을 확인해 주세요.',429);}
+  if(owner){const mine=await rows<Job>('malo_generation_jobs',{owner_id:owner,kind:'personal'});if(mine.filter(j=>['running','queued'].includes(j.status)).length>=3||mine.filter(j=>j.created_at.slice(0,10)===now().slice(0,10)).length>=5)throw new ApiError('GENERATION_LIMIT','시연용 생성 한도에 도달했어요. 진행 중인 작업을 확인해 주세요.',429);}
   const id=randomUUID(),time=now();
   try {await put('malo_generation_jobs',{id,owner_id:owner,request_key:owner?`${owner}:${request.clientRequestId}`:'catalog:'+request.catalogId,client_request_id:request.clientRequestId,request_hash:hash,kind:owner?'personal':'catalog',status:'queued',stage:'queued',request,checkpoint:{},chapter_id:null,error:null,attempts:0,worker_token:null,lease_until:null,notified_at:null,created_at:time,updated_at:time});}
   catch(error){const raced=(await rows<Job>('malo_generation_jobs',filters))[0];if(raced&&fingerprint(raced.request)===hash)return jobView(raced);throw error;}
@@ -34,6 +35,7 @@ export async function enqueueCurriculum(){const out=[];for(const c of curriculum
 // One provider step per claim: persisted checkpoints survive page closure and process restart.
 export async function workOne(){
   const worker=randomUUID(),j=await claimJob(worker);if(!j)return {worked:false};
+  if(j.kind==='report')return processReport(j,worker);
   const cp=j.checkpoint;
   const {clientRequestId:_,catalogId:__,...request}=j.request;
   try{

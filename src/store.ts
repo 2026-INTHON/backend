@@ -4,6 +4,7 @@ import { dirname } from 'node:path';
 import type { Profile } from './models';
 import { ApiError } from './errors';
 import { chapterSql } from './chapter-sql';
+import {upgradeEvaluation} from './reaction';
 
 let localDb: DatabaseSync | undefined;
 let localPath = '';
@@ -37,7 +38,14 @@ export async function rest(path: string, init: RequestInit = {}) {
 }
 function document(profile: Profile) { const { version: _, ...value } = profile; return value; }
 function decode(row: { id: string; version: number; document: string | Omit<Profile, 'version'> }): Profile {
-  return { ...(typeof row.document === 'string' ? JSON.parse(row.document) : row.document), id: row.id, version: row.version };
+  const profile:Profile={ ...(typeof row.document === 'string' ? JSON.parse(row.document) : row.document), id: row.id, version: row.version };
+  for(const play of profile.state.plays){
+    for(const turn of [...play.history,...play.turns.flatMap(item=>item.response?[item.response.turn]:[])]){
+      turn.evaluation=upgradeEvaluation(turn.evaluation) as typeof turn.evaluation;
+      if(turn.evaluation)turn.mark=turn.evaluation.mark;
+    }
+  }
+  return profile;
 }
 export async function readProfile(id: string): Promise<Profile | null> {
   if (dataMode() === 'supabase') {
