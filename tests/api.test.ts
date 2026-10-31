@@ -13,7 +13,7 @@ const guest = () => request('/auth/guest', {});
 test('Full learning flow persists mistakes, rewards exactly once and upgrades guest without loss', async () => {
   const auth = (await guest()).data; assert.equal(auth.user.kind, 'guest');
   const token = auth.accessToken;
-  const play = (await request('/sessions', { sceneId: 'ko-professor-strict' }, token)).data;
+  const play = (await request('/sessions', { sceneId: 'ko-professor-strict',aiMode:'mock' }, token)).data;
   assert.equal(play.aiMode, 'mock'); assert.equal(play.lives, 3);
   const mistakeInput = { clientTurnId: 'bad-1', inputType: 'choice', choiceId: 'c' };
   const bad = await request(`/sessions/${play.id}/turns`, mistakeInput, token);
@@ -33,7 +33,7 @@ test('Full learning flow persists mistakes, rewards exactly once and upgrades gu
   assert.deepEqual(first.data, second.data);
   assert.equal((await request('/wallet', undefined, token)).data.coins, 130);
   const mistakes = (await request('/mistakes', undefined, token)).data; assert.equal(mistakes.length, 2);
-  const practice = await request(`/mistakes/${bad.data.mistakeId}/practice`, { clientTurnId: 'practice-1', text: '교수님 죄송합니다. 내일 오후 5시까지 제출해도 될까요?' }, token);
+  const practice = await request(`/mistakes/${bad.data.mistakeId}/practice`, { clientTurnId: 'practice-1', aiMode:'mock', text: '교수님 죄송합니다. 내일 오후 5시까지 제출해도 될까요?' }, token);
   assert.equal(practice.status, 200); assert.equal(practice.data.mistake.resolved, true);
   const upgraded = await request('/auth/demo-upgrade', { displayName: 'Malo tester' }, token);
   assert.equal(upgraded.data.user.id, auth.user.id); assert.equal(upgraded.data.user.kind, 'member'); assert.equal(upgraded.data.user.isMock, true);
@@ -44,7 +44,7 @@ test('Full learning flow persists mistakes, rewards exactly once and upgrades gu
 });
 test('Profiles are isolated; refresh rotation and logout revoke tokens', async () => {
   const a = (await guest()).data, b = (await guest()).data;
-  const play = (await request('/sessions', { sceneId: 'en-friend-calm' }, a.accessToken)).data;
+  const play = (await request('/sessions', { sceneId: 'en-friend-calm',aiMode:'mock' }, a.accessToken)).data;
   assert.equal((await request(`/sessions/${play.id}`, undefined, b.accessToken)).status, 404);
   const refreshed = await request('/auth/refresh', { refreshToken: a.refreshToken }); assert.equal(refreshed.status, 200);
   assert.equal((await request('/auth/refresh', { refreshToken: a.refreshToken })).status, 401);
@@ -65,7 +65,7 @@ test('AI/network error and invalid STT do not consume life; retry can recover', 
 });
 test('Three clear mistakes fail, pause blocks turns and retry starts fresh', async () => {
   const auth = (await guest()).data;
-  const play = (await request('/sessions', { sceneId: 'ko-girlfriend-playful' }, auth.accessToken)).data;
+  const play = (await request('/sessions', { sceneId: 'ko-girlfriend-playful',aiMode:'mock' }, auth.accessToken)).data;
   await request(`/sessions/${play.id}/pause`, {}, auth.accessToken);
   assert.equal((await request(`/sessions/${play.id}/turns`, { clientTurnId: 'pause', inputType: 'choice', choiceId: 'b' }, auth.accessToken)).status, 409);
   await request(`/sessions/${play.id}/resume`, {}, auth.accessToken);

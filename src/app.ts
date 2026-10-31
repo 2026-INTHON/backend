@@ -74,10 +74,11 @@ function endpoint<I extends C.z.ZodType = C.z.ZodObject, O extends C.z.ZodType =
   });
 }
 function speechInput(p:Profile,session:C.SessionValue,text:string,turn?:C.TurnValue){return {text,pack:session.pack,characterId:session.characterId,personalityId:session.personalityId,emotion:turn?.emotion||session.npc.emotion,reaction:turn?.render?.reaction||session.npc.render?.reaction,speed:p.state.settings.voiceSpeed};}
-async function voiceUrl(c:Context<Env>,p:Profile,text:string,session:C.SessionValue,turn?:C.TurnValue){try{const audio=await aiRequest('/v1/speech/synthesize',speechInput(p,session,text,turn));const token=await Auth.signAudio(p.id,audio.assetId);const base=process.env.MALO_PUBLIC_BASE_URL||new URL(c.req.url).origin;return `${base}/api/v1/audio/${audio.assetId}?token=${encodeURIComponent(token)}`;}catch{return null;}}
+async function speechAsset(c:Context<Env>,p:Profile,input:ReturnType<typeof speechInput>){const audio=await aiRequest('/v1/speech/synthesize',input);const token=await Auth.signAudio(p.id,audio.assetId);const base=(process.env.MALO_PUBLIC_BASE_URL||new URL(c.req.url).origin).replace(/\/$/,'');return {...audio,mimeType:'audio/mpeg' as const,expiresIn:600,audioUrl:`${base}/api/v1/audio/${audio.assetId}?token=${encodeURIComponent(token)}`};}
+async function voiceUrl(c:Context<Env>,p:Profile,text:string,session:C.SessionValue,turn?:C.TurnValue){try{return (await speechAsset(c,p,speechInput(p,session,text,turn))).audioUrl;}catch{return null;}}
 const idParam = z.object({ id: z.string().uuid().openapi({ param: { name: 'id', in: 'path' } }) });
 const empty = z.object({});
-const mode = z.enum(['mock', 'live']).default('mock');
+const mode = z.enum(['mock', 'live']).default('live');
 const text = z.string().trim().min(1).max(1200);
 const clientTurnId = z.string().min(1).max(100);
 const feature = z.object({ id: z.string(), name: z.string(), description: z.string() });
@@ -85,7 +86,7 @@ const preview = z.object({ previewOnly: z.literal(true), realBilling: z.literal(
 
 endpoint({ method: 'get', path: '/health', tag: 'System', summary: '서버 상태와 실제/모의 기능 구분', auth: false,
   output: z.object({ status: z.literal('ok'), service: z.literal('malo-backend'), version: z.string(), storage: z.string(), defaultAiMode: z.string(), googleEnabled: z.boolean(), demoAuthEnabled: z.boolean(), aiConfigured: z.boolean() }),
-  run: () => ({ status: 'ok', service: 'malo-backend', version: '0.1.0', storage: dataMode(), defaultAiMode: 'mock', googleEnabled: process.env.MALO_GOOGLE_ENABLED === 'true', demoAuthEnabled: process.env.MALO_ALLOW_DEMO_AUTH === 'true', aiConfigured: !!process.env.MALO_AI_URL }) });
+  run: () => ({ status: 'ok', service: 'malo-backend', version: '0.1.0', storage: dataMode(), defaultAiMode: 'live', googleEnabled: process.env.MALO_GOOGLE_ENABLED === 'true', demoAuthEnabled: process.env.MALO_ALLOW_DEMO_AUTH === 'true', aiConfigured: !!process.env.MALO_AI_URL }) });
 endpoint({ method: 'get', path: '/auth/config', tag: 'Auth', summary: 'Google OAuth 준비 상태와 앱용 공개 설정', auth: false,
   output: z.object({ guestEnabled: z.boolean(), google: z.object({ enabled: z.boolean(), supabaseUrl: z.string().nullable(), publishableKey: z.string().nullable(), flow: z.string() }), demoUpgradeEnabled: z.boolean(),supabaseUrl:z.string().nullable(),publishableKey:z.string().nullable() }), run: () => {const cfg=Auth.authConfig();return {...cfg,supabaseUrl:cfg.google.supabaseUrl,publishableKey:cfg.google.publishableKey};} });
 endpoint({ method: 'post', path: '/auth/guest', tag: 'Auth', summary: '기록이 저장되는 게스트 계정 생성', auth: false,
@@ -117,7 +118,7 @@ endpoint({ method: 'get', path: '/settings', tag: 'Settings', summary: '설정 �
 endpoint({ method: 'patch', path: '/settings', tag: 'Settings', summary: '팩·음성 속도·자막·알림 설정 저장', input: C.Settings.partial(), output: C.Settings,
   run: async (_, body, p) => (await mutate(p!.id, user => { user.state.settings = { ...user.state.settings, ...body }; return user.state.settings; })).value });
 endpoint({ method: 'post', path: '/sessions', tag: 'Play', summary: '장면 시작 — FE는 live 명시, 기본 교육과정 성격 선택 가능', input: z.object({ sceneId: z.string(), aiMode: mode,personalityId:z.enum(['strict','playful','calm']).optional(),subtitleLanguage:C.SubtitleLanguage.optional() }), output: C.Session,
-  run: async(c,body,p)=>{const session=await Game.createPlay(p!.id,body.sceneId,body.aiMode,undefined,body.personalityId,body.subtitleLanguage);if(body.subtitleLanguage&&session.aiMode==='live')session.npc.audioUrl=await voiceUrl(c,p!,session.npc.text,session);return session;} });
+  run: async(c,body,p)=>{if(process.env.NODE_ENV==='production'&&body.aiMode==='mock')throw new ApiError('LIVE_AI_REQUIRED','실제 학습은 실시간 AI 모드로 시작해 주세요.',422);const session=await Game.createPlay(p!.id,body.sceneId,body.aiMode,undefined,body.personalityId,body.subtitleLanguage);if(body.subtitleLanguage&&session.aiMode==='live')session.npc.audioUrl=await voiceUrl(c,p!,session.npc.text,session);return session;} });
 endpoint({ method: 'get', path: '/sessions/{id}', tag: 'Play', summary: '장면 현재 상태/이어하기', params: idParam, output: C.Session, run: (c, _, p) => Game.publicPlay(Game.getPlay(p!, c.req.param('id')!)) });
 endpoint({ method: 'get', path: '/sessions/{id}/history', tag: 'Play', summary: '대화 내역', params: idParam, output: z.array(C.Turn), run: (c, _, p) => Game.getPlay(p!, c.req.param('id')!).history });
 endpoint({ method: 'post', path: '/sessions/{id}/turns', tag: 'Play', summary: '텍스트·선택지·확인한 STT 답변 제출', params: idParam,
@@ -138,9 +139,11 @@ endpoint({method:'get',path:'/sessions/{id}/ending',tag:'Play',summary:'완료�
 endpoint({ method: 'post', path: '/sessions/{id}/speech', tag: 'Speech', summary: '현재 NPC 또는 지정한 반응 대사 TTS — 서명 URL 반환', params: idParam, input: z.object({turnId:z.string().uuid().optional()}), output: C.AudioAsset,
   run: async (c, body, p) => { limit(`${p!.id}:tts`, 20); const play = Game.getPlay(p!, c.req.param('id')!), s = Game.publicPlay(play);
     const turn=body.turnId?play.history.find(t=>t.id===body.turnId):null;if(body.turnId&&!turn)throw new ApiError('TURN_NOT_FOUND','대사를 찾지 못했어요.',404);
-    const result = await aiRequest('/v1/speech/synthesize', speechInput(p!,s,turn?.npcReply||s.npc.text,turn||undefined));
-    const token = await Auth.signAudio(p!.id, result.assetId); const base = process.env.MALO_PUBLIC_BASE_URL || new URL(c.req.url).origin;
-    return { ...result, mimeType: 'audio/mpeg' as const, expiresIn: 600, audioUrl: `${base}/api/v1/audio/${result.assetId}?token=${encodeURIComponent(token)}` }; } });
+    return speechAsset(c,p!,speechInput(p!,s,turn?.npcReply||s.npc.text,turn||undefined)); } });
+
+endpoint({method:'post',path:'/speech/preview',tag:'Speech',summary:'기존 데모 대사·표현 연습의 캐릭터 음성 — 학습 세션을 만들지 않음',
+  input:z.object({text:z.string().trim().min(1).max(500),pack:C.Pack.default('ko'),characterId:z.enum(['girlfriend','friend','manager','professor']),personalityId:z.enum(['playful','strict','calm']).default('calm'),emotion:C.Emotion.default('neutral'),reaction:z.string().max(60).optional(),speed:z.number().min(.5).max(1.5).optional()}),output:C.AudioAsset,
+  run:async(c,b,p)=>{limit(`${p!.id}:tts`,20);await Content.persona(b.characterId,b.personalityId);return speechAsset(c,p!,{...b,reaction:b.reaction,speed:b.speed??p!.state.settings.voiceSpeed});}});
 
 endpoint({method:'post',path:'/speech/realtime-session',tag:'Speech',summary:'녹음 중 실시간 전사용 60초 임시 자격증명',input:z.object({pack:C.Pack.default('ko')}),output:z.object({value:z.string(),expiresAt:z.number(),model:z.string(),sampleRate:z.number(),session:z.unknown(),websocketUrl:z.string()}),run:(c,b,p)=>{limit(p!.id+':realtime',2);return aiRequest('/v1/speech/realtime-session',{pack:b.pack,userId:p!.id});}});
 
