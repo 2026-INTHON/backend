@@ -22,6 +22,5 @@ export function characterPersona(characterId:string, personalityId:string) {
 export function personaPrompt(characterId:string, personalityId:string) {
   const selected=characterPersona(characterId,personalityId);
   if(!selected)return undefined;
-  const {cardProfile:_,...prompt}=selected;
-  return {characterId,personalityId,...prompt};
+  return {characterId,personalityId,...selected};
 }

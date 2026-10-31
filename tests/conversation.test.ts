@@ -14,7 +14,7 @@ test('Conversation keeps actual replies, explicit correction restores the questi
   if(String(url).endsWith('/synthesize'))return Response.json({assetId:'a_'+'a'.repeat(40),cached:true,voice:'test'});
   if(String(url).endsWith('/evaluate')){
    requests.push(input);
-   return Response.json({evaluationMark:mark,goalAchieved:mark==='O',outcome:mark==='O'?'correct':mark==='X'?'misunderstanding':'clarify',confidence:.99,toneScore:80,native:false,toneLabel:'확인',feedback:'구체적으로 답해 보세요.',betterExpression:'알겠습니다.',reason:'대화 의도에 맞게 답했어요.',npcReply:`실제 반응 ${requests.length}: ${input.text}`,action:'상대를 바라본다.',cues:[{k:'표정',v:'차분하다.'}],views:[{who:'교수',meaning:'확인',cue:'높임말'},{who:'친구',meaning:'확인',cue:'반말'}],emotion:mark==='X'?'angry':'neutral',provider:'test',isMock:false});
+   return Response.json({npcSpeechLevel:'casual',evaluationMark:mark,goalAchieved:mark==='O',outcome:mark==='O'?'correct':mark==='X'?'misunderstanding':'clarify',confidence:.99,toneScore:80,native:false,toneLabel:'확인',feedback:'구체적으로 답해 보세요.',betterExpression:'알겠습니다.',reason:'대화 의도에 맞게 답했어요.',npcReply:`실제 반응 ${requests.length}: ${input.text}`,action:'상대를 바라본다.',cues:[{k:'표정',v:'차분하다.'}],views:[{who:'교수',meaning:'확인',cue:'높임말'},{who:'친구',meaning:'확인',cue:'반말'}],emotion:mark==='X'?'angry':'neutral',provider:'test',isMock:false});
   }
   throw new Error('Unexpected provider call '+url);
  };
@@ -23,6 +23,8 @@ test('Conversation keeps actual replies, explicit correction restores the questi
   const path='/sessions/'+start.id;
   const first=(await api(path+'/turns',{clientTurnId:'first',inputType:'text',text:'내일 오후 세 시에 제출하겠습니다.'},token)).data;
   assert.equal(first.session.nodeIndex,1);
+  assert.equal(requests[0].npcSpeechLevel,'polite');assert.equal(requests[0].allowSpeechLevelChange,false);
+  assert.equal(first.session.npc.speechLevel,'polite');assert.equal(first.turn.npcSpeechLevel,'polite');
   assert.equal(first.turn.prompt.text,start.npc.text);
   assert.equal(first.session.npc.text,first.turn.npcReply);
   assert.ok(requests[0].nextCheckpoint.goal);
@@ -41,7 +43,12 @@ test('Conversation keeps actual replies, explicit correction restores the questi
    assert.equal(turn.turn.prompt.text,requests.at(-1).node.npcText);
    assert.equal((await api(path,undefined,token)).data.npc.text,turn.turn.npcReply);
   }
-  mark='O';let final;
+  mark='O';
+  const agreed=(await api(path+'/turns',{clientTurnId:'register-agreement',inputType:'text',text:'저한테는 반말로 말씀하셔도 돼요.'},token)).data;
+  assert.equal(requests.at(-1).allowSpeechLevelChange,true);assert.equal(agreed.session.npc.speechLevel,'casual');
+  const restoredRegister=(await api(path+'/correction',{turnId:agreed.turn.id},token)).data;
+  assert.equal(restoredRegister.npc.speechLevel,'polite');
+  let final;
   for(let i=1;i<start.nodeCount;i++)final=(await api(path+'/turns',{clientTurnId:'end-'+i,inputType:'text',text:'네 교수님, 확인하고 수정하겠습니다.'},token)).data;
   assert.ok(final.result);assert.equal(final.result.achievement.reach,100);assert.ok(final.result.score<=100);
   assert.equal((await api(path+'/correction',{turnId:final.turn.id},token)).status,409);
