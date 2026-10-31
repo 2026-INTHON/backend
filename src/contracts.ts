@@ -22,7 +22,8 @@ export const Clue = z.object({ k: z.string().min(1).max(80), v: z.string().min(1
 export const Perspective = z.object({ who: z.string().min(1).max(100), meaning: z.string().min(1).max(1200), cue: z.string().min(1).max(400) }).openapi('Perspective');
 export const Scene = z.object({ id: z.string(), title: z.string(), situation: z.string(), goal: z.string(), pack: Pack, characterId: z.string(), personalityId: z.string(), nodeCount: z.number(), estimatedMinutes: z.number(), backgroundUrl:z.string().optional(), chapterId:z.string().optional(), source:z.string().optional(), clientKey:z.string().optional() }).openapi('Scene');
 export const Chapter = z.object({ id: z.string(), no: z.number(), characterId: z.string(), title: z.string(), desc: z.string(), locked: z.boolean(), displayLabel:z.string().optional(), pack:Pack.optional(), source:z.enum(['curriculum','examples','personal']).optional(), generationStatus:z.enum(['ready','generating','failed']).optional(),
-  subs: z.array(z.object({ id: z.string(), title: z.string(), sceneId: z.string(), personalityId: z.string(), state: z.enum(['done', 'now', 'open', 'locked']), score: z.number().nullable(), availability:z.enum(['ready','generating','unavailable']).optional() })),
+  translation:z.object({language:SubtitleLanguage,title:z.string(),desc:z.string()}).optional(),
+  subs: z.array(z.object({ id: z.string(), title: z.string(), sceneId: z.string(), personalityId: z.string(), state: z.enum(['done', 'now', 'open', 'locked']), score: z.number().nullable(), availability:z.enum(['ready','generating','unavailable']).optional(),translation:z.object({language:SubtitleLanguage,title:z.string()}).optional() })),
 }).openapi('Chapter');
 export const AudioMetrics = z.object({ durationMs: z.number(), pauseCount: z.number(), silenceRatio: z.number(), fillerCount: z.number(), speed: z.number(), speedUnit: z.enum(['characters_per_minute', 'words_per_minute']), measurement: z.string(), estimated: z.boolean() }).openapi('AudioMetrics');
 export const Feedback = z.object({
@@ -42,6 +43,7 @@ export const Session = z.object({
 }).openapi('PlaySession');
 export const ReactionEvaluation=z.object({mark:z.enum(['O','△','X','?']),category:z.enum(['excellent','acceptable','inappropriate','off_topic']),label:z.string(),reason:z.string(),reasonSubtitle:z.object({language:SubtitleLanguage,text:z.string()}).nullable(),goalAchieved:z.boolean(),progression:z.enum(['advance','retry']),policyVersion:z.enum(['reaction-v1-draft','judgment-v2-draft']),provisional:z.literal(true)}).openapi('ReactionEvaluation');
 export const Turn = z.object({ id: z.string().uuid(), clientTurnId: z.string(), inputType: z.enum(['text', 'choice', 'voice']), text: z.string(),
+  prompt:z.object({text:z.string(),action:z.string(),cues:z.array(Cue)}).optional(),
   outcome: z.enum(['correct', 'misunderstanding', 'clarify']), confidence: z.number(), feedback: Feedback,
   nodeId: z.string().default(''), mark: z.enum(['O', '△', 'X','?']).optional(), native: z.boolean().default(false), attempt: z.number().int().min(1).default(1),
   comparison: z.object({ firstAnswer: z.string(), currentAnswer: z.string(), improved: z.boolean() }).nullable().default(null),

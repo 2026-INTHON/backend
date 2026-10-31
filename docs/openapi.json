@@ -1170,6 +1170,34 @@
               "failed"
             ]
           },
+          "translation": {
+            "type": "object",
+            "properties": {
+              "language": {
+                "type": "string",
+                "enum": [
+                  "en",
+                  "ja",
+                  "zh",
+                  "vi",
+                  "es",
+                  "id",
+                  "ko"
+                ]
+              },
+              "title": {
+                "type": "string"
+              },
+              "desc": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "language",
+              "title",
+              "desc"
+            ]
+          },
           "subs": {
             "type": "array",
             "items": {
@@ -1208,6 +1236,30 @@
                     "ready",
                     "generating",
                     "unavailable"
+                  ]
+                },
+                "translation": {
+                  "type": "object",
+                  "properties": {
+                    "language": {
+                      "type": "string",
+                      "enum": [
+                        "en",
+                        "ja",
+                        "zh",
+                        "vi",
+                        "es",
+                        "id",
+                        "ko"
+                      ]
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "language",
+                    "title"
                   ]
                 }
               },
@@ -1252,6 +1304,28 @@
           },
           "text": {
             "type": "string"
+          },
+          "prompt": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "action": {
+                "type": "string"
+              },
+              "cues": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/NonverbalCue"
+                }
+              }
+            },
+            "required": [
+              "text",
+              "action",
+              "cues"
+            ]
           },
           "outcome": {
             "type": "string",
@@ -3484,7 +3558,7 @@
         "tags": [
           "Catalog"
         ],
-        "summary": "한국어/영어팩",
+        "summary": "현재 이용 가능한 학습 팩",
         "responses": {
           "200": {
             "description": "성공",
@@ -3801,6 +3875,23 @@
             },
             "required": false,
             "name": "characterId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "en",
+                "ja",
+                "zh",
+                "vi",
+                "es",
+                "id",
+                "ko"
+              ]
+            },
+            "required": false,
+            "name": "language",
             "in": "query"
           }
         ],
@@ -5056,6 +5147,178 @@
         }
       }
     },
+    "/api/v1/sessions/{id}/correction": {
+      "post": {
+        "tags": [
+          "Play"
+        ],
+        "summary": "사용자가 요청한 직전 답변 다시 말하기 — 기록·체력 유지",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "turnId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "turnId"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/PlaySession"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string"
+                        },
+                        "apiVersion": {
+                          "type": "string",
+                          "enum": [
+                            "v1"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "requestId",
+                        "apiVersion"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/sessions/{id}/turns": {
       "post": {
         "tags": [
@@ -5992,7 +6255,7 @@
         "tags": [
           "Play"
         ],
-        "summary": "같은 장면을 새 세션으로 다시 하기",
+        "summary": "같은 장면을 현재 선택 언어로 다시 하기",
         "security": [
           {
             "BearerAuth": []
@@ -6015,7 +6278,20 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "properties": {}
+                "properties": {
+                  "subtitleLanguage": {
+                    "type": "string",
+                    "enum": [
+                      "en",
+                      "ja",
+                      "zh",
+                      "vi",
+                      "es",
+                      "id",
+                      "ko"
+                    ]
+                  }
+                }
               }
             }
           }
