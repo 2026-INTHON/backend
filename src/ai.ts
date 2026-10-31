@@ -1,12 +1,12 @@
 import {assess} from './reaction';
-import { z, Cue, Perspective, Gesture } from './contracts';
+import { z, Cue, Perspective, Gesture, RepairAction, type DialogueRepairValue } from './contracts';
 import { characters, learningSupport, type Scenario, type SceneNode } from './catalog';
 import type { MetricsValue } from './contracts';
 import { ApiError } from './errors';
 import { personaPrompt } from './personas';
 import {initialSpeechLevel,mentionsSpeechLevel,type SpeechLevel} from './dialogue';
 
-export const Grade = z.object({ npcSpeechLevel:z.enum(['polite','casual']).nullable().default(null),conversationComplete:z.boolean().default(false), outcome: z.enum(['correct', 'misunderstanding', 'clarify']), confidence: z.number().min(0).max(1), toneScore: z.number().min(0).max(100),
+export const Grade = z.object({ repairAction:RepairAction.default('none'),repairIssue:z.string().max(400).default(''),npcSpeechLevel:z.enum(['polite','casual']).nullable().default(null),conversationComplete:z.boolean().default(false), outcome: z.enum(['correct', 'misunderstanding', 'clarify']), confidence: z.number().min(0).max(1), toneScore: z.number().min(0).max(100),
   imageAssetKey:z.string().nullable().default(null),evaluationMark:z.enum(['O','△','X','?']).nullable().default(null),reaction:z.enum(['happy','neutral','angry','sad','confused']).nullable().default(null),goalAchieved:z.boolean().nullable().default(null),reasonSubtitle:z.string().default(''),gesture:Gesture.default('idle'),npcReplySubtitle:z.string().default(''),routeId:z.string().nullable().optional(),endingId:z.string().nullable().optional(),
   native: z.boolean(),
   toneLabel: z.string(), feedback: z.string(), betterExpression: z.string(), reason: z.string(), npcReply: z.string(),
@@ -27,7 +27,7 @@ export async function aiRequest(path: string, body?: unknown, form?: FormData) {
     throw new ApiError('AI_UNAVAILABLE', 'AI 연결에 실패했어요. 체력 차감 없이 다시 시도해 주세요.', 502, true);
   }
 }
-export async function evaluate(scenario: Scenario, node: SceneNode, text: string, mode: 'mock' | 'live', metrics: MetricsValue | null = null, history: { user: string; npc: string }[] = [], allowedRoutes:string[]=[], allowedEndings:string[]=[],subtitleLanguage:string='en',imageOptions:unknown[]=[],livesRemaining=3,nextCheckpoint:{goal:string;draftLine:string;routeLines:Record<string,string>}|null=null,closingAllowed=false,npcSpeechLevel:SpeechLevel=initialSpeechLevel(scenario.nodes[0].npcText) ) {
+export async function evaluate(scenario: Scenario, node: SceneNode, text: string, mode: 'mock' | 'live', metrics: MetricsValue | null = null, history: { user: string; npc: string }[] = [], allowedRoutes:string[]=[], allowedEndings:string[]=[],subtitleLanguage:string='en',imageOptions:unknown[]=[],livesRemaining=3,nextCheckpoint:{goal:string;draftLine:string;routeLines:Record<string,string>}|null=null,closingAllowed=false,npcSpeechLevel:SpeechLevel=initialSpeechLevel(scenario.nodes[0].npcText),repair:DialogueRepairValue|null=null ) {
   const support = learningSupport(scenario, node);
   const allowSpeechLevelChange=mentionsSpeechLevel(text)||mentionsSpeechLevel(node.npcText);
   if (mode === 'mock') {
@@ -45,15 +45,26 @@ export async function evaluate(scenario: Scenario, node: SceneNode, text: string
   }
   const result = Grade.safeParse(await aiRequest('/v1/turns/evaluate', { mode, pack: scenario.pack, characterId: scenario.characterId, personalityId: scenario.personalityId,
     persona:personaPrompt(scenario.characterId,scenario.personalityId),
-    situation: scenario.situation, node: { ...node, ...support }, text, history: history.slice(-12), audioMetrics: metrics,allowedRoutes,allowedEndings,subtitleLanguage,imageOptions,livesRemaining,nextCheckpoint,closingAllowed,npcSpeechLevel,allowSpeechLevelChange }));
+    situation: scenario.situation, node: { ...node, ...support }, text, history: history.slice(-12), audioMetrics: metrics,allowedRoutes:repair?[]:allowedRoutes,allowedEndings:repair?[]:allowedEndings,subtitleLanguage,imageOptions,livesRemaining,nextCheckpoint:repair?null:nextCheckpoint,closingAllowed:closingAllowed&&!repair,npcSpeechLevel,allowSpeechLevelChange,repair }));
   if (!result.success) throw new ApiError('AI_RESPONSE_INVALID', 'AI 응답을 확인하지 못했어요. 체력 차감 없이 다시 시도해 주세요.', 502, true);
   const grade = result.data;
   grade.npcSpeechLevel=allowSpeechLevelChange?(grade.npcSpeechLevel||npcSpeechLevel):npcSpeechLevel;
   // Language help is a retry, even if a provider incorrectly graded it as a clear mistake.
   grade.native=needsLanguageHelp(text,scenario.pack,grade.native);
-  const assessment=assess({...grade,subtitleLanguage});
-  grade.conversationComplete=grade.conversationComplete&&closingAllowed&&assessment.progression==='advance'&&!grade.native;
-  if(assessment.progression==='advance'&&((allowedRoutes.length&&!allowedRoutes.includes(grade.routeId||''))||(allowedEndings.length&&(grade.conversationComplete||!nextCheckpoint)&&!allowedEndings.includes(grade.endingId||''))))throw new ApiError('STORY_ROUTE_INVALID','이야기 반응을 확인하지 못했어요. 체력 차감 없이 다시 시도해 주세요.',502,true);
+  let assessment=assess({...grade,subtitleLanguage});
+  if(repair){
+    const escalated=repair.kind==='clarification'&&grade.repairAction==='request_apology'&&assessment.mark==='X';
+    if(!escalated&&(grade.repairAction!=='resolved'||!['O','△'].includes(assessment.mark)||grade.confidence<.75))grade.repairAction='continue';
+  }else if(['continue','resolved'].includes(grade.repairAction))grade.repairAction='none';
+  if(grade.repairAction==='request_apology'&&assessment.mark!=='X')grade.repairAction='request_clarification';
+  if(grade.repairAction==='none'&&assessment.mark==='?')grade.repairAction='request_clarification';
+  const repairing=grade.repairAction!=='none';
+  if(repairing){
+    grade.goalAchieved=false;grade.routeId=null;grade.endingId=null;
+    if(grade.repairAction!=='resolved'&&assessment.mark==='O'){grade.evaluationMark='△';assessment=assess({...grade,subtitleLanguage});}
+  }
+  grade.conversationComplete=!repairing&&grade.conversationComplete&&closingAllowed&&assessment.progression==='advance'&&!grade.native;
+  if(!repairing&&assessment.progression==='advance'&&((allowedRoutes.length&&!allowedRoutes.includes(grade.routeId||''))||(allowedEndings.length&&(grade.conversationComplete||!nextCheckpoint)&&!allowedEndings.includes(grade.endingId||''))))throw new ApiError('STORY_ROUTE_INVALID','이야기 반응을 확인하지 못했어요. 체력 차감 없이 다시 시도해 주세요.',502,true);
   return {...grade,evaluationMark:assessment.mark,outcome:assessment.outcome,reason:assessment.reason,reasonSubtitle:assessment.reasonSubtitle};
 }
 export function needsLanguageHelp(text:string,pack:'ko'|'en',suggested:boolean){

@@ -34,7 +34,11 @@ export const Feedback = z.object({
   message: z.string(), betterExpression: z.string(), reason: z.string(), views: z.array(Perspective).max(3).default([]),
 }).openapi('TurnFeedback');
 export const Briefing=z.object({title:z.string().default(''),partner:z.string(),situation:z.string(),goal:z.string(),translation:z.object({language:SubtitleLanguage,title:z.string(),partner:z.string(),situation:z.string(),goal:z.string()}).nullable().default(null)}).openapi('SubchapterBriefing');
+export const RepairAction=z.enum(['none','request_apology','request_clarification','continue','resolved']);
+export const DialogueRepair=z.object({kind:z.enum(['apology','clarification']),issue:z.string().max(400),triggerText:z.string().max(1200),resumeNpcText:z.string().max(2000)}).openapi('DialogueRepair');
+export type DialogueRepairValue=z.infer<typeof DialogueRepair>;
 export const Session = z.object({
+  repair:DialogueRepair.nullable().optional(),
   id: z.string().uuid(), sceneId: z.string(), characterId: z.string(), personalityId: z.string(), pack: Pack,
   aiMode: z.enum(['mock', 'live']), status: z.enum(['active', 'paused', 'succeeded', 'failed', 'abandoned']),
   lives: z.number(), initialLives: z.number(), nodeIndex: z.number(), nodeCount: z.number(),
@@ -44,8 +48,9 @@ export const Session = z.object({
 }).openapi('PlaySession');
 export const ReactionEvaluation=z.object({mark:z.enum(['O','△','X','?']),category:z.enum(['excellent','acceptable','inappropriate','off_topic']),label:z.string(),reason:z.string(),reasonSubtitle:z.object({language:SubtitleLanguage,text:z.string()}).nullable(),goalAchieved:z.boolean(),progression:z.enum(['advance','retry']),policyVersion:z.enum(['reaction-v1-draft','judgment-v2-draft']),provisional:z.literal(true)}).openapi('ReactionEvaluation');
 export const Turn = z.object({ id: z.string().uuid(), clientTurnId: z.string(), inputType: z.enum(['text', 'choice', 'voice']), text: z.string(),
+  repairAction:RepairAction.optional(),
   npcSpeechLevel:z.enum(['polite','casual']).optional(),
-  prompt:z.object({speechLevel:z.enum(['polite','casual']).optional(),text:z.string(),action:z.string(),cues:z.array(Cue)}).optional(),
+  prompt:z.object({repair:DialogueRepair.nullable().optional(),speechLevel:z.enum(['polite','casual']).optional(),text:z.string(),action:z.string(),cues:z.array(Cue)}).optional(),
   outcome: z.enum(['correct', 'misunderstanding', 'clarify']), confidence: z.number(), feedback: Feedback,
   nodeId: z.string().default(''), mark: z.enum(['O', '△', 'X','?']).optional(), native: z.boolean().default(false), attempt: z.number().int().min(1).default(1),
   comparison: z.object({ firstAnswer: z.string(), currentAnswer: z.string(), improved: z.boolean() }).nullable().default(null),

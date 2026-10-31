@@ -24,6 +24,9 @@
       "PlaySession": {
         "type": "object",
         "properties": {
+          "repair": {
+            "$ref": "#/components/schemas/DialogueRepair"
+          },
           "id": {
             "type": "string",
             "format": "uuid"
@@ -214,6 +217,39 @@
           "hintsUsed",
           "createdAt",
           "updatedAt"
+        ]
+      },
+      "DialogueRepair": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "apology",
+              "clarification"
+            ]
+          },
+          "issue": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "triggerText": {
+            "type": "string",
+            "maxLength": 1200
+          },
+          "resumeNpcText": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "kind",
+          "issue",
+          "triggerText",
+          "resumeNpcText"
         ]
       },
       "Pack": {
@@ -1362,6 +1398,16 @@
           "text": {
             "type": "string"
           },
+          "repairAction": {
+            "type": "string",
+            "enum": [
+              "none",
+              "request_apology",
+              "request_clarification",
+              "continue",
+              "resolved"
+            ]
+          },
           "npcSpeechLevel": {
             "type": "string",
             "enum": [
@@ -1372,6 +1418,9 @@
           "prompt": {
             "type": "object",
             "properties": {
+              "repair": {
+                "$ref": "#/components/schemas/DialogueRepair"
+              },
               "speechLevel": {
                 "type": "string",
                 "enum": [
@@ -9817,6 +9866,22 @@
                         "evaluation": {
                           "type": "object",
                           "properties": {
+                            "repairAction": {
+                              "type": "string",
+                              "enum": [
+                                "none",
+                                "request_apology",
+                                "request_clarification",
+                                "continue",
+                                "resolved"
+                              ],
+                              "default": "none"
+                            },
+                            "repairIssue": {
+                              "type": "string",
+                              "maxLength": 400,
+                              "default": ""
+                            },
                             "npcSpeechLevel": {
                               "type": [
                                 "string",
