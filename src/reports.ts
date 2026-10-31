@@ -36,7 +36,8 @@ function transcript(play:Play){
   const saved=play.scenario.nodes.findIndex(node=>node.id===turn.nodeId);
   const base=activeNode({...play,nodeIndex:saved>=0?saved:index,dialogue:undefined});
   const node=turn.prompt?{...base,npcText:turn.prompt.text,action:turn.prompt.action,cues:turn.prompt.cues}:base;
-  if(turn.outcome==='correct')index++;return {turn,node};
+  if(turn.prompt?.repair){node.goal=turn.prompt.repair.kind==='apology'?'상처 준 말을 인정하고 사과하거나 오해를 설명하며 대화를 회복하기':'불명확했던 말의 뜻을 구체적으로 설명하기';node.hiddenThought=turn.prompt.repair.issue;}
+  if(turn.outcome==='correct'&&(!turn.repairAction||turn.repairAction==='none'))index++;return {turn,node};
  });
 }
 function coachInput(play:Play,language:Language){
