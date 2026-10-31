@@ -24,11 +24,15 @@ test('Failed endings use negative uploaded images while respectful deferral and 
  try{
   for(ending of ['breakdown','deferred','happy']){
    const token=(await api('/auth/guest',{})).accessToken,session=await api('/sessions',{sceneId:'ending-images',aiMode:'live'},token);let last;
+   const active=await app.request('/api/v1/sessions/'+session.id+'/ending',{headers:{Authorization:'Bearer '+token}});assert.equal(active.status,409);
    for(let i=0;i<3;i++){remaining=ending==='breakdown'?3-i:3;last=await api('/sessions/'+session.id+'/turns',{clientTurnId:'ending-'+i,inputType:'text',text:'상황을 확인하고 답변합니다.'},token);}
    assert.equal(last.result.ending.id,ending);assert.equal(last.result.ending.render.assetKey,last.turn.render.assetKey);
    if(ending==='breakdown'){assert.equal(last.session.status,'failed');assert.equal(last.turn.mark,'X');assert.equal(last.turn.emotion,'angry');assert.equal(last.turn.render.reaction,'contempt');}
    else {assert.equal(last.result.passed,true);assert.equal(last.turn.mark,'O');assert.equal(last.result.score,100);assert.equal(last.turn.render.assetKey,ending==='deferred'?'soft-sad':'happy');}
    const saved=await api('/sessions/'+session.id+'/result',undefined,token);assert.equal(saved.ending.render.assetKey,last.turn.render.assetKey);
+   const card=await api('/sessions/'+session.id+'/ending',undefined,token);assert.equal(card.render.assetKey,last.turn.render.assetKey);assert.equal(card.dialogue.text,last.turn.npcReply);assert.equal(card.dialogue.turnId,last.turn.id);assert.ok(card.recap.story);assert.ok(card.recap.prompt);
+   if(ending==='happy')assert.ok(card.recap.comment.includes('좋은 인상'));else assert.ok(!card.recap.comment.includes('답변만 쏙쏙'));
+   const other=(await api('/auth/guest',{})).accessToken;const denied=await app.request('/api/v1/sessions/'+session.id+'/ending',{headers:{Authorization:'Bearer '+other}});assert.equal(denied.status,404);
   }
  }finally{globalThis.fetch=real;}
 });

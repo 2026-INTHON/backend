@@ -1,3 +1,4 @@
+import * as Endings from './endings';
 import * as CharacterImages from './character-images';
 import {assess} from './reaction';
 import * as Content from './content';
@@ -66,7 +67,7 @@ export async function createPlay(id: string, sceneId: string, aiMode: 'mock' | '
   const actor=(await Content.characters()).find(c=>c.id===scenario!.characterId);scenario={...scenario,partnerName:actor?.name||scenario.partnerName};
   if(scenario.source==='personal'||scenario.source==='curriculum')aiMode='live';
   let subtitles:Record<string,string>={};
-  if(aiMode==='live'&&subtitleLanguage){const texts=[...new Set([...scenario.nodes.map(n=>n.npcText),...(scenario.routes||[]).flatMap(r=>r.overrides.map(n=>n.npcText)),...Object.values(briefingFor(scenario))])];const translated=await aiRequest('/v1/subtitles',{language:subtitleLanguage,texts});if(!Array.isArray(translated.texts)||translated.texts.length!==texts.length)throw new ApiError('SUBTITLE_INVALID','자막을 확인하지 못했어요.',502,true);subtitles=Object.fromEntries(texts.map((text,i)=>[text,translated.texts[i]]));}
+  if(aiMode==='live'&&subtitleLanguage){const texts=[...new Set([...scenario.nodes.map(n=>n.npcText),...(scenario.routes||[]).flatMap(r=>r.overrides.map(n=>n.npcText)),...Object.values(briefingFor(scenario)),...Endings.endingTexts(scenario)])];const translated=await aiRequest('/v1/subtitles',{language:subtitleLanguage,texts});if(!Array.isArray(translated.texts)||translated.texts.length!==texts.length)throw new ApiError('SUBTITLE_INVALID','자막을 확인하지 못했어요.',502,true);subtitles=Object.fromEntries(texts.map((text,i)=>[text,translated.texts[i]]));}
   const play: Play = { id: randomUUID(), sceneId, scenario, aiMode,subtitleLanguage,subtitles, status: 'active', lives: 3, nodeIndex: 0, hintsUsed: 0, emotion: 'neutral', turns: [], history: [], result: null, createdAt: now(), updatedAt: now() };
   await mutate(id, p => {
     if (p.state.plays.length >= 500) throw new ApiError('DEMO_STORAGE_LIMIT', '시연용 장면 저장 한도에 도달했어요.', 409);
@@ -104,11 +105,10 @@ function finish(p: Profile, play: Play) {
   const passed = play.status === 'succeeded';
   const quality=good.reduce((sum,t)=>sum+(t.evaluation?.mark==='△'?.65:1),0);
   const rewardCoins = passed ? 30 : 5;
-  const ending=play.scenario.endings?.find(e=>e.id===(play.status==='failed'?'breakdown':play.endingId||'happy'));
   play.result = { sessionId: play.id,report:null, passed, score: Math.max(0, Math.min(100, Math.round((quality / play.scenario.nodes.length) * 100 - bad.length * 8 - play.hintsUsed * 2))),
     goodUtterances: good.filter(t=>t.evaluation?.mark!=='△').map(t => ({ text: t.text, reason: t.feedback.reason })),
     improvableUtterances: play.history.filter(t => t.outcome !== 'correct'||t.evaluation?.mark==='△').map(t => ({ text: t.text, betterExpression: t.feedback.betterExpression, reason: t.feedback.reason, mistakeId: p.state.mistakes.find(m => m.turnId === t.id)?.id || null })),
-    rewardCoins, durationMs: Date.now() - Date.parse(play.createdAt), nextSceneId: play.scenario.nextSceneId ?? null, ending: ending?{...ending,emotion:play.emotion,render:play.history.at(-1)?.render||null}:null,
+    rewardCoins, durationMs: Date.now() - Date.parse(play.createdAt), nextSceneId: play.scenario.nextSceneId ?? null, ending: Endings.presentation(play),
     achievement: {
       reach: Math.round(good.length / play.scenario.nodes.length * 100),
       infer: Math.max(30, 100 - (play.hintKeys || []).filter(k => k.endsWith(':1')).length * 15 - ((play.hintKeys || []).filter(k => k.endsWith(':2')).length + Math.max(0, play.hintsUsed - (play.hintKeys || []).length)) * 25),
