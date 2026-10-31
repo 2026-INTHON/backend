@@ -43,10 +43,14 @@ export const Turn = z.object({ id: z.string().uuid(), clientTurnId: z.string(), 
   evaluation:ReactionEvaluation.nullable().default(null),gesture:Gesture.default('idle'),render:CharacterRender.nullable().default(null), npcReplySubtitle:z.object({language:SubtitleLanguage,text:z.string()}).nullable().default(null),audioUrl:z.string().nullable().default(null), npcReply: z.string(), action: z.string().default(''), cues: z.array(Cue).default([]), emotion: Emotion, lifeDelta: z.number(), provider: z.string(), isMock: z.boolean(), createdAt: z.string(),
 }).openapi('Turn');
 export const ReportMeta=z.object({reportId:z.string().uuid(),status:z.enum(['queued','running','ready','failed'])});
+export const Ending=z.object({id:z.string(),kind:z.enum(['happy','bad']),title:z.string(),text:z.string(),emotion:Emotion.optional(),render:CharacterRender.nullable().default(null),
+  dialogue:z.object({turnId:z.string(),text:z.string(),subtitle:z.object({language:SubtitleLanguage,text:z.string()}).nullable(),audioUrl:z.string().nullable().default(null)}).nullable().default(null),
+  recap:z.object({title:z.string(),story:z.string(),comment:z.string(),prompt:z.string(),translation:z.object({language:SubtitleLanguage,title:z.string(),story:z.string(),comment:z.string(),prompt:z.string()}).nullable()}).nullable().default(null),
+}).openapi('EndingPresentation');
 export const Result = z.object({ sessionId: z.string(), report:ReportMeta.nullable().default(null),passed: z.boolean(), score: z.number(),
   goodUtterances: z.array(z.object({ text: z.string(), reason: z.string() })),
   improvableUtterances: z.array(z.object({ text: z.string(), betterExpression: z.string(), reason: z.string(), mistakeId: z.string().nullable() })),
-  ending:z.object({id:z.string(),kind:z.enum(['happy','bad']),title:z.string(),text:z.string(),emotion:Emotion.optional(),render:CharacterRender.nullable().default(null)}).nullable().default(null), rewardCoins: z.number(), durationMs: z.number(), nextSceneId: z.string().nullable(),
+  ending:Ending.nullable().default(null), rewardCoins: z.number(), durationMs: z.number(), nextSceneId: z.string().nullable(),
   achievement: z.object({ reach: z.number().min(0).max(100), infer: z.number().min(0).max(100), self: z.number().min(0).max(100) }).nullable().default(null),
 }).openapi('SessionResult');
 export const TurnResult = z.object({ turn: Turn, session: Session, result: Result.nullable(),

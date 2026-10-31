@@ -472,41 +472,7 @@
             }
           },
           "ending": {
-            "type": [
-              "object",
-              "null"
-            ],
-            "properties": {
-              "id": {
-                "type": "string"
-              },
-              "kind": {
-                "type": "string",
-                "enum": [
-                  "happy",
-                  "bad"
-                ]
-              },
-              "title": {
-                "type": "string"
-              },
-              "text": {
-                "type": "string"
-              },
-              "emotion": {
-                "$ref": "#/components/schemas/Emotion"
-              },
-              "render": {
-                "$ref": "#/components/schemas/CharacterImageRender"
-              }
-            },
-            "default": null,
-            "required": [
-              "id",
-              "kind",
-              "title",
-              "text"
-            ]
+            "$ref": "#/components/schemas/EndingPresentation"
           },
           "rewardCoins": {
             "type": "number"
@@ -559,6 +525,164 @@
           "rewardCoins",
           "durationMs",
           "nextSceneId"
+        ]
+      },
+      "EndingPresentation": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "happy",
+              "bad"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "emotion": {
+            "$ref": "#/components/schemas/Emotion"
+          },
+          "render": {
+            "$ref": "#/components/schemas/CharacterImageRender"
+          },
+          "dialogue": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "turnId": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "subtitle": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "language": {
+                    "type": "string",
+                    "enum": [
+                      "en",
+                      "ja",
+                      "zh",
+                      "vi",
+                      "es",
+                      "id",
+                      "ko"
+                    ]
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "language",
+                  "text"
+                ]
+              },
+              "audioUrl": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "default": null
+              }
+            },
+            "default": null,
+            "required": [
+              "turnId",
+              "text",
+              "subtitle"
+            ]
+          },
+          "recap": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "story": {
+                "type": "string"
+              },
+              "comment": {
+                "type": "string"
+              },
+              "prompt": {
+                "type": "string"
+              },
+              "translation": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "language": {
+                    "type": "string",
+                    "enum": [
+                      "en",
+                      "ja",
+                      "zh",
+                      "vi",
+                      "es",
+                      "id",
+                      "ko"
+                    ]
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "story": {
+                    "type": "string"
+                  },
+                  "comment": {
+                    "type": "string"
+                  },
+                  "prompt": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "language",
+                  "title",
+                  "story",
+                  "comment",
+                  "prompt"
+                ]
+              }
+            },
+            "default": null,
+            "required": [
+              "title",
+              "story",
+              "comment",
+              "prompt",
+              "translation"
+            ]
+          }
+        },
+        "default": null,
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "text"
         ]
       },
       "ApiError": {
@@ -5980,6 +6104,159 @@
                   "properties": {
                     "data": {
                       "$ref": "#/components/schemas/SessionResult"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string"
+                        },
+                        "apiVersion": {
+                          "type": "string",
+                          "enum": [
+                            "v1"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "requestId",
+                        "apiVersion"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{id}/ending": {
+      "get": {
+        "tags": [
+          "Play"
+        ],
+        "summary": "완료한 대화의 엔딩 대사·이미지·정리 코멘트·선택 언어 번역",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/EndingPresentation"
                     },
                     "meta": {
                       "type": "object",
