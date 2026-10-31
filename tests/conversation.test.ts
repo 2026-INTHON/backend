@@ -36,13 +36,17 @@ test('Conversation keeps actual replies, explicit correction restores the questi
   const corrected=(await api(path+'/turns',{clientTurnId:'corrected',inputType:'text',text:'네 교수님. 내일 세 시까지 보내 드리겠습니다.'},token)).data;
   assert.equal(corrected.turn.comparison.firstAnswer,first.turn.text);
   assert.equal((await api(path+'/correction',{turnId:first.turn.id},token)).status,409);
+  let unclearId='';
   for(const code of ['△','X','?']){
    mark=code;
    const turn=(await api(path+'/turns',{clientTurnId:'grade-'+code,inputType:'text',text:'답변 '+code},token)).data;
+   unclearId=turn.turn.id;
    assert.equal(turn.session.nodeIndex,1);assert.equal(turn.session.npc.text,turn.turn.npcReply);
    assert.equal(turn.turn.prompt.text,requests.at(-1).node.npcText);
    assert.equal((await api(path,undefined,token)).data.npc.text,turn.turn.npcReply);
   }
+  // Explicit correction of the unclear utterance returns to its original context.
+  await api(path+'/correction',{turnId:unclearId},token);
   mark='O';
   const agreed=(await api(path+'/turns',{clientTurnId:'register-agreement',inputType:'text',text:'저한테는 반말로 말씀하셔도 돼요.'},token)).data;
   assert.equal(requests.at(-1).allowSpeechLevelChange,true);assert.equal(agreed.session.npc.speechLevel,'casual');

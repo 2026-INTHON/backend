@@ -40,10 +40,11 @@ export function publicPlay(play: Play): SessionValue {
   const { action, cues } = learningSupport(s, node);
   const brief=briefingFor(s,play.sceneId);const translated=Object.values(brief).every(text=>!!play.subtitles?.[text]);
   return { id: play.id, sceneId: play.sceneId, characterId: s.characterId, personalityId: s.personalityId, pack: s.pack, aiMode: play.aiMode,
+    repair:play.repair||null,
     status: play.status, lives: play.lives, initialLives: 3, nodeIndex: play.nodeIndex, nodeCount: s.nodes.length,
     briefing:{...brief,translation:translated?{language:play.subtitleLanguage||'en',title:play.subtitles![brief.title],partner:play.subtitles![brief.partner],situation:play.subtitles![brief.situation],goal:play.subtitles![brief.goal]}:null},
     npc: {speechLevel:play.speechLevel||initialSpeechLevel(s.nodes[0].npcText),gesture:play.gesture||'idle',render:null, subtitle:play.subtitles?.[node.npcText]?{language:play.subtitleLanguage||'en',text:play.subtitles[node.npcText]}:null,audioUrl:null,text: node.npcText, emotion: play.emotion, assetKey: play.imageAssetKey||`characters/${s.characterId}/${play.emotion}`, action, cues },
-    chapterId:s.chapterId||null, backgroundUrl:s.backgroundUrl||null, branchId:play.branchId||null, choices: play.status === 'active' ? node.choices : [], hintsUsed: play.hintsUsed, createdAt: play.createdAt, updatedAt: play.updatedAt };
+    chapterId:s.chapterId||null, backgroundUrl:s.backgroundUrl||null, branchId:play.branchId||null, choices: play.status === 'active'&&!play.repair ? node.choices : [], hintsUsed: play.hintsUsed, createdAt: play.createdAt, updatedAt: play.updatedAt };
 }
 function streak(days: string[]) {
   const dates = [...new Set(days)].sort();
@@ -111,6 +112,7 @@ export async function revealHint(id: string, sessionId: string, step: 1 | 2) {
     const key = `${node.id}:${step}`;
     play.hintKeys ||= [];
     if (!play.hintKeys.includes(key)) { play.hintKeys.push(key); play.hintsUsed++; play.updatedAt = now(); }
+    if(play.repair)return {nodeId:node.id,step,clue:[{k:'상황',v:play.repair.issue}],hiddenThought:step===2?(play.repair.kind==='apology'?'방금 말로 불편했던 부분을 먼저 풀고 싶어요.':'어떤 뜻으로 말했는지 이해하고 싶어요.'):null,tip:step===2?(play.repair.kind==='apology'?'상처 준 부분을 인정하고 사과하거나, 오해가 있었다면 차분히 설명해 보세요.':'방금 말의 뜻을 구체적으로 설명해 보세요.'):null,isFictional:true as const,session:publicPlay(play)};
     return { nodeId: node.id, step, clue: learningSupport(play.scenario, node).clue,
       hiddenThought: step === 2 ? node.hiddenThought : null, tip: step === 2 ? node.tip : null,
       isFictional: true as const, session: publicPlay(play) };
@@ -134,6 +136,7 @@ export async function correctLastTurn(id:string,sessionId:string,turnId:string){
     if(index<0)throw new ApiError('CORRECTION_UNAVAILABLE','이전 버전 대화는 장면 전체를 다시 시작해 주세요.',409);
     play.nodeIndex=index;
     const prompt=turn.prompt;
+    play.repair=prompt?.repair||null;
     play.dialogue=prompt?{nodeIndex:index,npcText:prompt.text,action:prompt.action,cues:prompt.cues}:undefined;
     const previous=play.history.at(-2);
     play.speechLevel=prompt?.speechLevel||previous?.npcSpeechLevel||initialSpeechLevel(play.scenario.nodes[0].npcText);
@@ -145,7 +148,7 @@ export async function correctLastTurn(id:string,sessionId:string,turnId:string){
 }
 function finish(p: Profile, play: Play) {
   if (play.result) return;
-  const latest=[...new Map(play.history.map((turn,i)=>[turn.nodeId||`legacy-${i}`,turn])).values()];
+  const latest=[...new Map(play.history.filter(turn=>!turn.repairAction||turn.repairAction==='none').map((turn,i)=>[turn.nodeId||`legacy-${i}`,turn])).values()];
   const good = latest.filter(t => t.outcome === 'correct'), bad = play.history.filter(t => t.outcome === 'misunderstanding' && !t.native);
   const passed = play.status === 'succeeded';
   // A completed farewell can omit one redundant closing beat; it is not a missed goal.
@@ -184,6 +187,7 @@ export async function submitTurn(id: string, sessionId: string, input: TurnInput
     let text = input.text?.trim() || '';
     let metrics: MetricsValue | null = null;
     if (input.inputType === 'choice') {
+      if(play.repair)throw new ApiError('CHOICE_INVALID','방금 대화에 대해 직접 설명하거나 사과해 주세요.',422);
       const choice = node.choices.find(c => c.id === input.choiceId);
       if (!choice) throw new ApiError('CHOICE_INVALID', '현재 장면의 선택지를 골라주세요.', 422);
       text = choice.text;
@@ -201,8 +205,10 @@ export async function submitTurn(id: string, sessionId: string, input: TurnInput
   try {
     const imageOptions=(await CharacterImages.variants('')).filter(i=>i.characterId===play!.scenario.characterId&&i.imageUrl).map(({assetKey,emotion,gesture,label,reaction,pose,useWhen,tags,endingPreferred})=>({assetKey,emotion,gesture,label:label||'',reaction:reaction||'',pose:pose||'',useWhen:useWhen||'',tags:tags||[],endingPreferred:endingPreferred||false}));
     const closingAllowed=play!.nodeIndex>=Math.max(1,play!.scenario.nodes.length-2);
-    const grade = await evaluate(play!.scenario, activeNode(play!), text!, play!.aiMode, metrics, play!.history.map(t => ({ user: t.text, npc: t.npcReply })), play!.nodeIndex===play!.scenario.branchAt ? (play!.scenario.routes||[]).map(r=>r.id) : [], closingAllowed ? (play!.scenario.endings||[]).map(e=>e.id) : [],play!.subtitleLanguage||'en',imageOptions,play!.lives,nextCheckpoint(play!),closingAllowed,play!.speechLevel||initialSpeechLevel(play!.scenario.nodes[0].npcText));
+    const grade = await evaluate(play!.scenario, activeNode(play!), text!, play!.aiMode, metrics, play!.history.map(t => ({ user: t.text, npc: t.npcReply })), play!.nodeIndex===play!.scenario.branchAt ? (play!.scenario.routes||[]).map(r=>r.id) : [], closingAllowed ? (play!.scenario.endings||[]).map(e=>e.id) : [],play!.subtitleLanguage||'en',imageOptions,play!.lives,nextCheckpoint(play!),closingAllowed,play!.speechLevel||initialSpeechLevel(play!.scenario.nodes[0].npcText),play!.repair||null);
     const assessment=assess(grade),failed=play!.lives<=1&&assessment.outcome==='misunderstanding';
+    // A repaired relationship is a good response, but does not complete the paused story goal.
+    if(grade.repairAction!=='none'){assessment.progression='retry';assessment.goalAchieved=false;}
     const lastSuccess=assessment.progression==='advance'&&(grade.conversationComplete||play!.nodeIndex===play!.scenario.nodes.length-1);
     const badEnding=failed||(lastSuccess&&play!.scenario.endings?.some(e=>e.id===grade.endingId&&e.kind==='bad'))||false;
     grade.emotion=CharacterImages.endingEmotion(grade.emotion,badEnding,failed);
@@ -221,8 +227,9 @@ export async function submitTurn(id: string, sessionId: string, input: TurnInput
       const node = activeNode(current);
       const previous = current.history.filter(t => t.nodeId === node.id);
       const turn: TurnValue = { id: turnId, clientTurnId: input.clientTurnId, inputType: input.inputType, text: text!, outcome, confidence: grade.confidence,
+        repairAction:grade.repairAction,
         npcSpeechLevel:grade.npcSpeechLevel||current.speechLevel||initialSpeechLevel(current.scenario.nodes[0].npcText),
-        prompt:{speechLevel:current.speechLevel||initialSpeechLevel(current.scenario.nodes[0].npcText),text:node.npcText,action:node.action||'',cues:node.cues||[]},
+        prompt:{repair:current.repair||null,speechLevel:current.speechLevel||initialSpeechLevel(current.scenario.nodes[0].npcText),text:node.npcText,action:node.action||'',cues:node.cues||[]},
         nodeId:node.id,mark:assessment.mark,evaluation:{...assessment,reasonSubtitle:assessment.reasonSubtitle?{language:current.subtitleLanguage||'en',text:assessment.reasonSubtitle}:null}, native: grade.native, attempt: previous.length + 1,
         comparison: previous.length ? { firstAnswer: previous[0].text, currentAnswer: text!, improved: outcome === 'correct' } : null,
         feedback: { tone: { score: grade.toneScore, label: grade.toneLabel, source: 'text_politeness' }, speed: metrics ? { value: metrics.speed, unit: metrics.speedUnit, estimated: true } : null,
@@ -230,6 +237,10 @@ export async function submitTurn(id: string, sessionId: string, input: TurnInput
           message: grade.feedback, betterExpression: grade.betterExpression, reason: assessment.reason, views: grade.views }, gesture:grade.gesture,render:selectedImage,npcReplySubtitle:grade.npcReplySubtitle?{language:current.subtitleLanguage||'en',text:grade.npcReplySubtitle}:null,audioUrl:null,npcReply: grade.npcReply, action: grade.action, cues: grade.cues, emotion: grade.emotion,
         lifeDelta, provider: grade.provider, isMock: grade.isMock, createdAt: now() };
       current.speechLevel=turn.npcSpeechLevel;current.imageAssetKey=selectedImage.assetKey; current.history.push(turn); current.lives += lifeDelta; current.emotion = grade.emotion; current.gesture=grade.gesture; current.updatedAt = now();
+      if(grade.repairAction==='resolved')current.repair=null;
+      else if(grade.repairAction==='request_apology'||grade.repairAction==='request_clarification'){
+        current.repair={kind:grade.repairAction==='request_apology'?'apology':'clarification',issue:(grade.repairIssue||assessment.reason).slice(0,400),triggerText:text!,resumeNpcText:current.repair?.resumeNpcText||node.npcText};
+      }
       let mistakeId: string | null = null;
       if (outcome !== 'correct' && !grade.native) {
         mistakeId = randomUUID();
@@ -237,7 +248,7 @@ export async function submitTurn(id: string, sessionId: string, input: TurnInput
           category: outcome === 'misunderstanding' ? 'politeness' : 'clarity', pack: current.scenario.pack, practiceCount: 0, resolved: false, createdAt: now(), nodeIndex: current.nodeIndex, scenario: {...current.scenario,nodes:current.scenario.nodes.map((n,i)=>i===current.nodeIndex?node:n)}, practiceRequests: {} });
       }
       if (current.lives <= 0) current.status = 'failed';
-      else if (outcome === 'correct') { if(current.nodeIndex===current.scenario.branchAt) current.branchId=current.scenario.routes?.some(r=>r.id===grade.routeId)?grade.routeId??undefined:current.scenario.routes?.[0]?.id; if(lastSuccess)current.endingId=current.scenario.endings?.some(e=>e.id===grade.endingId)?grade.endingId??'happy':'happy'; current.nodeIndex=lastSuccess?current.scenario.nodes.length:current.nodeIndex+1; if (current.nodeIndex === current.scenario.nodes.length) current.status = 'succeeded'; }
+      else if (assessment.progression === 'advance') { if(current.nodeIndex===current.scenario.branchAt) current.branchId=current.scenario.routes?.some(r=>r.id===grade.routeId)?grade.routeId??undefined:current.scenario.routes?.[0]?.id; if(lastSuccess)current.endingId=current.scenario.endings?.some(e=>e.id===grade.endingId)?grade.endingId??'happy':'happy'; current.nodeIndex=lastSuccess?current.scenario.nodes.length:current.nodeIndex+1; if (current.nodeIndex === current.scenario.nodes.length) current.status = 'succeeded'; }
       if(current.aiMode==='live'){
         current.dialogue={nodeIndex:current.nodeIndex,npcText:grade.npcReply,action:grade.action,cues:grade.cues};
         if(grade.npcReplySubtitle)current.subtitles={...current.subtitles,[grade.npcReply]:grade.npcReplySubtitle};
