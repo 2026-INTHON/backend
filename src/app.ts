@@ -1,4 +1,5 @@
 import * as Endings from './endings';
+import { localizedChapters, requireKorean, translations } from './translations';
 import * as Reports from './reports';
 import {ReportResource} from './report-contracts';
 import * as CharacterImages from './character-images';
@@ -106,23 +107,24 @@ endpoint({ method: 'post', path: '/auth/google/exchange', tag: 'Auth', summary: 
   run: async (c, body) => Auth.googleExchange(body.supabaseAccessToken, c.req.header('Authorization') ? await Auth.authenticate(c.req.header('Authorization')) : undefined) });
 endpoint({ method: 'get', path: '/me', tag: 'Home', summary: '내 계정', output: C.User, run: (_, __, p) => Auth.publicUser(p!) });
 endpoint({ method: 'get', path: '/home', tag: 'Home', summary: '이어하기·오늘의 장면·재화·출석 팝업', output: C.Home, run: (_, __, p) => Game.home(p!) });
-endpoint({ method: 'get', path: '/packs', tag: 'Catalog', summary: '한국어/영어팩', auth: false, output: z.array(feature), run: () => packs });
+endpoint({ method: 'get', path: '/packs', tag: 'Catalog', summary: '현재 이용 가능한 학습 팩', auth: false, output: z.array(feature), run: () => packs.filter(pack => pack.id === 'ko') });
 endpoint({ method: 'get', path: '/characters', tag: 'Catalog', summary: '4명 캐릭터와 각 3가지 성격', auth: false, output: z.array(C.Character), run: () => Content.characters() });
 endpoint({ method: 'get', path: '/chapters', tag: 'Catalog', summary: '캐릭터별 챕터·성격별 서브 챕터와 내 진행 상태',
-  query: z.object({ pack: C.Pack.optional(), characterId: z.string().optional() }), output: z.array(C.Chapter),
-  run: (c, _, p) => Game.chapters(p!, (c.req.query('pack') || p!.state.settings.pack) as 'ko' | 'en', c.req.query('characterId')) });
+  query: z.object({ pack: C.Pack.optional(), characterId: z.string().optional(), language:C.SubtitleLanguage.optional() }), output: z.array(C.Chapter),
+  run: async (c, _, p) => {const pack=c.req.query('pack')||'ko';requireKorean(pack);return localizedChapters(await Game.chapters(p!, 'ko', c.req.query('characterId')), C.SubtitleLanguage.optional().parse(c.req.query('language')));} });
 endpoint({ method: 'get', path: '/scenes', tag: 'Catalog', summary: '팩·캐릭터·성격별 장면 목록', auth: false,
   query: z.object({ pack: C.Pack.optional(), characterId: z.string().optional(), personalityId: z.string().optional() }), output: z.array(C.Scene),
-  run: c => Content.scenes((c.req.query('pack') || 'ko') as 'ko' | 'en', c.req.query('characterId'), c.req.query('personalityId')) });
+  run: c => {requireKorean(c.req.query('pack')||'ko');return Content.scenes('ko', c.req.query('characterId'), c.req.query('personalityId'));} });
 endpoint({ method: 'get', path: '/scenes/{sceneId}', tag: 'Catalog', summary: '장면 브리핑', auth: false,
   params: z.object({ sceneId: z.string() }), output: C.Scene, run: async c => { const s = await Content.scene(c.req.param('sceneId')!); if (!s) throw new ApiError('SCENE_NOT_FOUND', '장면을 찾지 못했어요.', 404); return { ...s, id: c.req.param('sceneId')!, nodeCount: s.nodes.length, estimatedMinutes: s.estimatedMinutes||3 }; } });
-endpoint({ method: 'get', path: '/settings', tag: 'Settings', summary: '설정 조회', output: C.Settings, run: (_, __, p) => p!.state.settings });
+endpoint({ method: 'get', path: '/settings', tag: 'Settings', summary: '설정 조회', output: C.Settings, run: (_, __, p) => ({...p!.state.settings,pack:'ko' as const}) });
 endpoint({ method: 'patch', path: '/settings', tag: 'Settings', summary: '팩·음성 속도·자막·알림 설정 저장', input: C.Settings.partial(), output: C.Settings,
-  run: async (_, body, p) => (await mutate(p!.id, user => { user.state.settings = { ...user.state.settings, ...body }; return user.state.settings; })).value });
+  run: async (_, body, p) => {requireKorean(body.pack||'ko');return (await mutate(p!.id, user => { user.state.settings = { ...user.state.settings, ...body,pack:'ko' }; return user.state.settings; })).value;} });
 endpoint({ method: 'post', path: '/sessions', tag: 'Play', summary: '장면 시작 — FE는 live 명시, 기본 교육과정 성격 선택 가능', input: z.object({ sceneId: z.string(), aiMode: mode,personalityId:z.enum(['strict','playful','calm']).optional(),subtitleLanguage:C.SubtitleLanguage.optional() }), output: C.Session,
   run: async(c,body,p)=>{if(process.env.NODE_ENV==='production'&&body.aiMode==='mock')throw new ApiError('LIVE_AI_REQUIRED','실제 학습은 실시간 AI 모드로 시작해 주세요.',422);const session=await Game.createPlay(p!.id,body.sceneId,body.aiMode,undefined,body.personalityId,body.subtitleLanguage);if(body.subtitleLanguage&&session.aiMode==='live')session.npc.audioUrl=await voiceUrl(c,p!,session.npc.text,session);return session;} });
 endpoint({ method: 'get', path: '/sessions/{id}', tag: 'Play', summary: '장면 현재 상태/이어하기', params: idParam, output: C.Session, run: (c, _, p) => Game.publicPlay(Game.getPlay(p!, c.req.param('id')!)) });
 endpoint({ method: 'get', path: '/sessions/{id}/history', tag: 'Play', summary: '대화 내역', params: idParam, output: z.array(C.Turn), run: (c, _, p) => Game.getPlay(p!, c.req.param('id')!).history });
+endpoint({method:'post',path:'/sessions/{id}/correction',tag:'Play',summary:'사용자가 요청한 직전 답변 다시 말하기 — 기록·체력 유지',params:idParam,input:z.object({turnId:z.string().uuid()}),output:C.Session,run:(c,body,p)=>Game.correctLastTurn(p!.id,c.req.param('id')!,body.turnId)});
 endpoint({ method: 'post', path: '/sessions/{id}/turns', tag: 'Play', summary: '텍스트·선택지·확인한 STT 답변 제출', params: idParam,
   description: 'clientTurnId를 재시도 시 그대로 사용. 동일 ID/내용은 같은 응답. 다른 내용은 409. 명확한 실수만 체력 -1; 애매한 답/AI 오류는 차감 없음. 텍스트·선택지는 속도/망설임 null.',
   input: z.object({ clientTurnId, inputType: z.enum(['text', 'choice', 'voice']), text: text.optional(), choiceId: z.string().optional(), transcriptId: z.string().uuid().optional(), realtime:z.boolean().default(false) }), output: C.TurnResult,
@@ -131,10 +133,15 @@ endpoint({ method: 'post', path: '/sessions/{id}/hint', tag: 'Play', summary: '2
   description: 'step=1은 주목 표현·행동·상황 단서만 반환하며 hiddenThought/tip은 null. step=2는 속마음과 표현 팁을 추가 공개. 같은 노드·단계의 재조회는 hintsUsed를 중복 증가시키지 않음. 기존 클라이언트의 {} 요청은 step=2로 처리.',
   input: z.object({ step: z.union([z.literal(1), z.literal(2)]).default(2) }),
   output: z.object({ nodeId: z.string(), step: z.union([z.literal(1), z.literal(2)]), clue: z.array(C.Clue), hiddenThought: z.string().nullable(), tip: z.string().nullable(), isFictional: z.literal(true), session: C.Session }),
-  run: (c, body, p) => Game.revealHint(p!.id, c.req.param('id')!, body.step) });
+  run: async (c, body, p) => {
+    const hint=await Game.revealHint(p!.id,c.req.param('id')!,body.step),lang=Game.getPlay(p!,c.req.param('id')!).subtitleLanguage;
+    if(!lang||lang==='ko')return hint;
+    const tr=await translations([...hint.clue.flatMap(cue=>[cue.k,cue.v]),hint.hiddenThought||'',hint.tip||''],lang);
+    return {...hint,clue:hint.clue.map(cue=>({k:tr[cue.k],v:tr[cue.v]})),hiddenThought:hint.hiddenThought?tr[hint.hiddenThought]:null,tip:hint.tip?tr[hint.tip]:null};
+  } });
 for (const action of ['pause', 'resume', 'abandon'] as const) endpoint({ method: 'post', path: `/sessions/{id}/${action}`, tag: 'Play', summary: `${action} — 일시정지/재개/나가기`, params: idParam, input: empty, output: C.Session, run: (c, _, p) => Game.transition(p!.id, c.req.param('id')!, action) });
-endpoint({ method: 'post', path: '/sessions/{id}/retry', tag: 'Play', summary: '같은 장면을 새 세션으로 다시 하기', params: idParam, input: empty, output: C.Session,
-  run: (c, _, p) => { const old = Game.getPlay(p!, c.req.param('id')!); return Game.createPlay(p!.id, old.sceneId, old.aiMode, old.scenario,undefined,old.subtitleLanguage); } });
+endpoint({ method: 'post', path: '/sessions/{id}/retry', tag: 'Play', summary: '같은 장면을 현재 선택 언어로 다시 하기', params: idParam, input: z.object({subtitleLanguage:C.SubtitleLanguage.optional()}), output: C.Session,
+  run: (c, body, p) => { const old = Game.getPlay(p!, c.req.param('id')!); return Game.createPlay(p!.id, old.sceneId, old.aiMode, old.scenario,undefined,body.subtitleLanguage||old.subtitleLanguage); } });
 endpoint({ method: 'get', path: '/sessions/{id}/result', tag: 'Play', summary: '결과·잘한 말·아쉬운 말·지급된 재화', params: idParam, output: C.Result,
   run: async(c, _, p) => { const play=Game.getPlay(p!,c.req.param('id')!);let result=play.result?{...play.result,ending:Endings.presentation(play)}:null; if (!result) throw new ApiError('RESULT_NOT_READY', '장면을 마친 후 확인할 수 있어요.', 409); if(play.aiMode==='live'){const report=await Reports.read(p!.id,play.id).catch(()=>null);if(report)result={...result,report:{reportId:report.reportId,status:report.status}};}return result; } });
 endpoint({method:'get',path:'/sessions/{id}/ending',tag:'Play',summary:'완료한 대화의 엔딩 대사·이미지·정리 코멘트·선택 언어 번역',params:idParam,output:C.Ending,run:(c,_,p)=>{const play=Game.getPlay(p!,c.req.param('id')!);if(!play.result)throw new ApiError('ENDING_NOT_READY','대화를 마친 후 엔딩을 확인할 수 있어요.',409);return Endings.presentation(play);}});
@@ -193,7 +200,7 @@ app.get('/images/:assetId', async c => {
 app.get('/catalog-assets/:filename',async c=>{const name=c.req.param('filename');if(!/^(char|card|bg)-[a-z]+\.png$/.test(name))throw new ApiError('IMAGE_NOT_FOUND','이미지를 찾지 못했어요.',404);try{const content=await readFile('public/assets/catalog/'+name);c.header('Content-Type','image/png');c.header('Cache-Control','public, max-age=3600');return c.body(content);}catch{throw new ApiError('IMAGE_NOT_FOUND','이미지를 찾지 못했어요.',404);}});
 app.openAPIRegistry.registerPath({ method: 'get', path: '/images/{assetId}', tags: ['Catalog'], summary: '공유 캐릭터 WebP 이미지 — 영구 캐시 가능한 콘텐츠 해시 URL', request: { params: z.object({ assetId: z.string().regex(/^i_[a-f0-9]{40}$/) }) }, responses: { 200: { description: 'WebP, no generation API call', content: { 'image/webp': { schema: { type: 'string', format: 'binary' } } } } } });
 
-endpoint({method:'post',path:'/chapter-generations',tag:'Generation',summary:'나만의 챕터 생성 예약 — 즉시 반환, 서버에서 계속 생성',input:ChapterInput,output:JobView,run:(_,body,p)=>Generation.create(p!.id,body)});
+endpoint({method:'post',path:'/chapter-generations',tag:'Generation',summary:'나만의 챕터 생성 예약 — 즉시 반환, 서버에서 계속 생성',input:ChapterInput,output:JobView,run:(_,body,p)=>{requireKorean(body.pack);return Generation.create(p!.id,body);}});
 endpoint({method:'get',path:'/chapter-generations',tag:'Generation',summary:'내 생성 작업 목록',output:z.array(JobView),run:(_,__,p)=>Generation.jobs(p!.id)});
 endpoint({method:'get',path:'/chapter-generations/{id}',tag:'Generation',summary:'내 생성 상태 — 완료 시 chapterId',params:idParam,output:JobView,run:(c,_,p)=>Generation.job(p!.id,c.req.param('id')!)});
 endpoint({method:'post',path:'/chapter-generations/{id}/retry',tag:'Generation',summary:'실패한 생성을 저장한 단계부터 재시도',params:idParam,input:empty,output:JobView,run:(c,_,p)=>{limit(p!.id+':generation-retry',3);return Generation.retry(p!.id,c.req.param('id')!);}});

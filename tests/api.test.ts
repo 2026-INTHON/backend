@@ -44,7 +44,7 @@ test('Full learning flow persists mistakes, rewards exactly once and upgrades gu
 });
 test('Profiles are isolated; refresh rotation and logout revoke tokens', async () => {
   const a = (await guest()).data, b = (await guest()).data;
-  const play = (await request('/sessions', { sceneId: 'en-friend-calm',aiMode:'mock' }, a.accessToken)).data;
+  const play = (await request('/sessions', { sceneId: 'ko-friend-calm',aiMode:'mock' }, a.accessToken)).data;
   assert.equal((await request(`/sessions/${play.id}`, undefined, b.accessToken)).status, 404);
   const refreshed = await request('/auth/refresh', { refreshToken: a.refreshToken }); assert.equal(refreshed.status, 200);
   assert.equal((await request('/auth/refresh', { refreshToken: a.refreshToken })).status, 401);
@@ -77,10 +77,10 @@ test('Three clear mistakes fail, pause blocks turns and retry starts fresh', asy
 });
 test('Real-account merge transfers data once and invalidates guest credentials', async () => {
   const a = (await guest()).data, b = (await guest()).data;
-  await request('/settings', { pack: 'en' }, a.accessToken, 'PATCH');
+  await request('/settings', { voiceSpeed: .8 }, a.accessToken, 'PATCH');
   await mergeProfiles(a.user.id, b.user.id);
   assert.equal((await request('/me', undefined, a.accessToken)).status, 401);
-  assert.equal((await request('/settings', undefined, b.accessToken)).data.pack, 'en');
+  assert.equal((await request('/settings', undefined, b.accessToken)).data.voiceSpeed, .8);
   assert.equal((await readProfile(b.user.id))!.state.coins, 100);
   await assert.rejects(mergeProfiles(a.user.id, b.user.id));
 });
@@ -89,7 +89,10 @@ test('Swagger, request validation, catalog and preview response contracts', asyn
   const invalid = await request('/sessions', { sceneId: 'unknown' }, auth.accessToken); assert.equal(invalid.status, 404);
   const invalidBody = await request('/settings', { voiceSpeed: 9 }, auth.accessToken, 'PATCH'); assert.equal(invalidBody.status, 422);
   assert.equal((await request('/characters')).data.length, 4);
-  assert.equal((await request('/scenes?pack=en')).data.length, 12);
+  assert.equal((await request('/scenes?pack=en')).error.code, 'PACK_DISABLED');
+  assert.equal((await request('/sessions', {sceneId:'en-friend-calm'}, auth.accessToken)).error.code, 'PACK_DISABLED');
+  assert.equal((await request('/settings', {pack:'en'}, auth.accessToken,'PATCH')).error.code, 'PACK_DISABLED');
+  assert.deepEqual((await request('/packs')).data.map((pack:{id:string})=>pack.id), ['ko']);
   const shop = (await request('/shop', undefined, auth.accessToken)).data; assert.equal(shop.previewOnly, true); assert.equal(shop.realBilling, false);
   const spec = app.getOpenAPI31Document(documentConfig); assert.ok(Object.keys(spec.paths || {}).length >= 35);
   assert.ok(spec.paths?.['/api/v1/audio/{assetId}']); assert.ok(Object.keys(spec.paths || {}).every(path => !path.includes('/api/v1/api/v1')));

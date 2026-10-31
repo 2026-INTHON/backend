@@ -1,4 +1,6 @@
 import * as Endings from './endings';
+import { translations } from './translations';
+import { conciseBrief } from './briefings';
 import * as CharacterImages from './character-images';
 import {assess} from './reaction';
 import * as Content from './content';
@@ -18,12 +20,24 @@ export function getPlay(p: Profile, id: string) {
   if (!play) throw new ApiError('SESSION_NOT_FOUND', '장면을 찾지 못했어요.', 404);
   return play;
 }
-export function activeNode(play:Play){const node=play.scenario.nodes[Math.min(play.nodeIndex,play.scenario.nodes.length-1)];const override=play.scenario.routes?.find(r=>r.id===play.branchId)?.overrides.find(o=>o.nodeId===node.id);return override?{...node,npcText:override.npcText,goodExample:override.goodExample,hiddenThought:override.hiddenThought}:node;}
-export function briefingFor(s:Scenario){return {title:s.title,partner:s.partnerName||characters.find(c=>c.id===s.characterId)?.role||s.characterId,situation:s.situation.split(/(?<=[.!?])\s+|\n+/).filter(Boolean).slice(0,2).join(' '),goal:s.goal};}
+export function activeNode(play:Play){
+  const node=play.scenario.nodes[Math.min(play.nodeIndex,play.scenario.nodes.length-1)];
+  const override=play.scenario.routes?.find(r=>r.id===play.branchId)?.overrides.find(o=>o.nodeId===node.id);
+  const base=override?{...node,npcText:override.npcText,goodExample:override.goodExample,hiddenThought:override.hiddenThought}:node;
+  const spoken=play.dialogue?.nodeIndex===play.nodeIndex?play.dialogue:null;
+  return spoken?{...base,npcText:spoken.npcText,action:spoken.action,cues:spoken.cues}:base;
+}
+
+function nextCheckpoint(play:Play){
+  if(play.nodeIndex+1>=play.scenario.nodes.length)return null;
+  const next=activeNode({...play,nodeIndex:play.nodeIndex+1,dialogue:undefined});
+  return {goal:next.goal,draftLine:next.npcText,routeLines:Object.fromEntries((play.scenario.routes||[]).flatMap(route=>{const override=route.overrides.find(o=>o.nodeId===next.id);return override?[[route.id,override.npcText]]:[];}))};
+}
+export function briefingFor(s:Scenario,id=''){return {title:s.title,partner:s.partnerName||characters.find(c=>c.id===s.characterId)?.role||s.characterId,...conciseBrief(s,id)};}
 export function publicPlay(play: Play): SessionValue {
   const s = play.scenario, node = activeNode(play);
   const { action, cues } = learningSupport(s, node);
-  const brief=briefingFor(s);const translated=Object.values(brief).every(text=>!!play.subtitles?.[text]);
+  const brief=briefingFor(s,play.sceneId);const translated=Object.values(brief).every(text=>!!play.subtitles?.[text]);
   return { id: play.id, sceneId: play.sceneId, characterId: s.characterId, personalityId: s.personalityId, pack: s.pack, aiMode: play.aiMode,
     status: play.status, lives: play.lives, initialLives: 3, nodeIndex: play.nodeIndex, nodeCount: s.nodes.length,
     briefing:{...brief,translation:translated?{language:play.subtitleLanguage||'en',title:play.subtitles![brief.title],partner:play.subtitles![brief.partner],situation:play.subtitles![brief.situation],goal:play.subtitles![brief.goal]}:null},
@@ -41,11 +55,11 @@ function streak(days: string[]) {
 }
 export function wallet(p: Profile) { return { coins: p.state.coins, currency: 'MALO_COIN' as const, realMoney: false as const }; }
 export async function home(p: Profile) {
-  const scenes = await Content.scenes(p.state.settings.pack);
+  const scenes = await Content.scenes('ko');
   const resume = [...p.state.plays].reverse().find(s => s.status === 'active' || s.status === 'paused');
   const attendance = streak(p.state.attendance.days);
   const celebration = attendance.current > 0 && !p.state.attendance.acknowledged.includes(day()) ? { id: day(), days: attendance.current, message: `${attendance.current}일째 말하기 연습 중!` } : null;
-  return { user: publicUser(p), wallet: wallet(p), settings: p.state.settings, resumeSession: resume ? publicPlay(resume) : null,
+  return { user: publicUser(p), wallet: wallet(p), settings: {...p.state.settings,pack:'ko' as const}, resumeSession: resume ? publicPlay(resume) : null,
     todayScene: resume ? sceneSummary(resume.scenario, resume.sceneId) : scenes[0], otherScenes: scenes, celebration };
 }
 export const chapters = Content.chapters;
@@ -63,6 +77,7 @@ export function records(p: Profile) {
 export async function createPlay(id: string, sceneId: string, aiMode: 'mock' | 'live', customScenario?: Scenario, personalityId?:string,subtitleLanguage?:'en'|'ja'|'zh'|'vi'|'es'|'id'|'ko') {
   let scenario = customScenario || await Content.scene(sceneId,id);
   if (!scenario) throw new ApiError('SCENE_NOT_FOUND', '장면을 찾지 못했어요.', 404);
+  if(scenario.pack!=='ko')throw new ApiError('PACK_DISABLED','현재 한국어팩만 이용할 수 있어요.',422);
   if(personalityId&&scenario.source!=='personal'){
     await Content.persona(scenario.characterId,personalityId);
     // The legacy chapter represents one story; use the selected personality's script.
@@ -76,7 +91,7 @@ export async function createPlay(id: string, sceneId: string, aiMode: 'mock' | '
   const actor=(await Content.characters()).find(c=>c.id===scenario!.characterId);scenario={...scenario,partnerName:actor?.name||scenario.partnerName};
   if(scenario.source==='personal'||scenario.source==='curriculum')aiMode='live';
   let subtitles:Record<string,string>={};
-  if(aiMode==='live'&&subtitleLanguage){const texts=[...new Set([...scenario.nodes.map(n=>n.npcText),...(scenario.routes||[]).flatMap(r=>r.overrides.map(n=>n.npcText)),...Object.values(briefingFor(scenario)),...Endings.endingTexts(scenario)])];const translated=await aiRequest('/v1/subtitles',{language:subtitleLanguage,texts});if(!Array.isArray(translated.texts)||translated.texts.length!==texts.length)throw new ApiError('SUBTITLE_INVALID','자막을 확인하지 못했어요.',502,true);subtitles=Object.fromEntries(texts.map((text,i)=>[text,translated.texts[i]]));}
+  if(aiMode==='live'&&subtitleLanguage){const texts=[...scenario.nodes.map(n=>n.npcText),...(scenario.routes||[]).flatMap(r=>r.overrides.map(n=>n.npcText)),...Object.values(briefingFor(scenario,sceneId)),...Endings.endingTexts(scenario)];subtitles=await translations(texts,subtitleLanguage);}
   const play: Play = { id: randomUUID(), sceneId, scenario, aiMode,subtitleLanguage,subtitles, status: 'active', lives: 3, nodeIndex: 0, hintsUsed: 0, emotion: 'neutral', turns: [], history: [], result: null, createdAt: now(), updatedAt: now() };
   await mutate(id, p => {
     if (p.state.plays.length >= 500) throw new ApiError('DEMO_STORAGE_LIMIT', '시연용 장면 저장 한도에 도달했어요.', 409);
@@ -108,9 +123,28 @@ export async function transition(id: string, sessionId: string, action: 'pause' 
     return publicPlay(play);
   }); return value;
 }
+export async function correctLastTurn(id:string,sessionId:string,turnId:string){
+  return (await mutate(id,p=>{
+    const play=getPlay(p,sessionId);assertNoPending(play);
+    if(play.status!=='active')throw new ApiError('SESSION_NOT_ACTIVE','진행 중인 대화에서 다시 말할 수 있어요.',409);
+    const turn=play.history.at(-1);
+    if(!turn||turn.id!==turnId)throw new ApiError('CORRECTION_STALE','가장 최근 답변만 다시 말할 수 있어요.',409);
+    const index=play.scenario.nodes.findIndex(node=>node.id===turn.nodeId);
+    if(index<0)throw new ApiError('CORRECTION_UNAVAILABLE','이전 버전 대화는 장면 전체를 다시 시작해 주세요.',409);
+    play.nodeIndex=index;
+    const prompt=turn.prompt;
+    play.dialogue=prompt?{nodeIndex:index,npcText:prompt.text,action:prompt.action,cues:prompt.cues}:undefined;
+    const previous=play.history.at(-2);
+    play.emotion=previous?.emotion||'neutral';play.gesture=previous?.gesture||'idle';
+    play.imageAssetKey=previous?.render?.assetKey;
+    // Keep history, spent lives and mistakes; correction cannot farm rewards or erase an answer.
+    play.updatedAt=now();return publicPlay(play);
+  })).value;
+}
 function finish(p: Profile, play: Play) {
   if (play.result) return;
-  const good = play.history.filter(t => t.outcome === 'correct'), bad = play.history.filter(t => t.outcome === 'misunderstanding' && !t.native);
+  const latest=[...new Map(play.history.map((turn,i)=>[turn.nodeId||`legacy-${i}`,turn])).values()];
+  const good = latest.filter(t => t.outcome === 'correct'), bad = play.history.filter(t => t.outcome === 'misunderstanding' && !t.native);
   const passed = play.status === 'succeeded';
   const quality=good.reduce((sum,t)=>sum+(t.evaluation?.mark==='△'?.65:1),0);
   const rewardCoins = passed ? 30 : 5;
@@ -162,7 +196,7 @@ export async function submitTurn(id: string, sessionId: string, input: TurnInput
   const { play, text, metrics } = reservation.value;
   try {
     const imageOptions=(await CharacterImages.variants('')).filter(i=>i.characterId===play!.scenario.characterId&&i.imageUrl).map(({assetKey,emotion,gesture,label,reaction,pose,useWhen,tags,endingPreferred})=>({assetKey,emotion,gesture,label:label||'',reaction:reaction||'',pose:pose||'',useWhen:useWhen||'',tags:tags||[],endingPreferred:endingPreferred||false}));
-    const grade = await evaluate(play!.scenario, activeNode(play!), text!, play!.aiMode, metrics, play!.history.map(t => ({ user: t.text, npc: t.npcReply })), play!.nodeIndex===play!.scenario.branchAt ? (play!.scenario.routes||[]).map(r=>r.id) : [], play!.nodeIndex===play!.scenario.nodes.length-1 ? (play!.scenario.endings||[]).map(e=>e.id) : [],play!.subtitleLanguage||'en',imageOptions,play!.lives);
+    const grade = await evaluate(play!.scenario, activeNode(play!), text!, play!.aiMode, metrics, play!.history.map(t => ({ user: t.text, npc: t.npcReply })), play!.nodeIndex===play!.scenario.branchAt ? (play!.scenario.routes||[]).map(r=>r.id) : [], play!.nodeIndex===play!.scenario.nodes.length-1 ? (play!.scenario.endings||[]).map(e=>e.id) : [],play!.subtitleLanguage||'en',imageOptions,play!.lives,nextCheckpoint(play!));
     const assessment=assess(grade),failed=play!.lives<=1&&assessment.outcome==='misunderstanding';
     const lastSuccess=assessment.progression==='advance'&&play!.nodeIndex===play!.scenario.nodes.length-1;
     const badEnding=failed||(lastSuccess&&play!.scenario.endings?.some(e=>e.id===grade.endingId&&e.kind==='bad'))||false;
@@ -180,8 +214,9 @@ export async function submitTurn(id: string, sessionId: string, input: TurnInput
       const outcome=assessment.outcome;
       const lifeDelta = outcome === 'misunderstanding' ? -1 : 0;
       const node = activeNode(current);
-      const previous = current.history.slice(current.history.findLastIndex(t => t.outcome === 'correct') + 1).filter(t => !t.nodeId || t.nodeId === node.id);
+      const previous = current.history.filter(t => t.nodeId === node.id);
       const turn: TurnValue = { id: turnId, clientTurnId: input.clientTurnId, inputType: input.inputType, text: text!, outcome, confidence: grade.confidence,
+        prompt:{text:node.npcText,action:node.action||'',cues:node.cues||[]},
         nodeId:node.id,mark:assessment.mark,evaluation:{...assessment,reasonSubtitle:assessment.reasonSubtitle?{language:current.subtitleLanguage||'en',text:assessment.reasonSubtitle}:null}, native: grade.native, attempt: previous.length + 1,
         comparison: previous.length ? { firstAnswer: previous[0].text, currentAnswer: text!, improved: outcome === 'correct' } : null,
         feedback: { tone: { score: grade.toneScore, label: grade.toneLabel, source: 'text_politeness' }, speed: metrics ? { value: metrics.speed, unit: metrics.speedUnit, estimated: true } : null,
@@ -193,10 +228,14 @@ export async function submitTurn(id: string, sessionId: string, input: TurnInput
       if (outcome !== 'correct' && !grade.native) {
         mistakeId = randomUUID();
         p.state.mistakes.push({ id: mistakeId, sessionId, turnId, sceneTitle: current.scenario.title, original: text!, betterExpression: grade.betterExpression, reason: assessment.reason,
-          category: outcome === 'misunderstanding' ? 'politeness' : 'clarity', pack: current.scenario.pack, practiceCount: 0, resolved: false, createdAt: now(), nodeIndex: current.nodeIndex, scenario: current.scenario, practiceRequests: {} });
+          category: outcome === 'misunderstanding' ? 'politeness' : 'clarity', pack: current.scenario.pack, practiceCount: 0, resolved: false, createdAt: now(), nodeIndex: current.nodeIndex, scenario: {...current.scenario,nodes:current.scenario.nodes.map((n,i)=>i===current.nodeIndex?node:n)}, practiceRequests: {} });
       }
       if (current.lives <= 0) current.status = 'failed';
       else if (outcome === 'correct') { if(current.nodeIndex===current.scenario.branchAt) current.branchId=current.scenario.routes?.some(r=>r.id===grade.routeId)?grade.routeId??undefined:current.scenario.routes?.[0]?.id; if(current.nodeIndex===current.scenario.nodes.length-1)current.endingId=current.scenario.endings?.some(e=>e.id===grade.endingId)?grade.endingId??'happy':'happy'; current.nodeIndex++; if (current.nodeIndex === current.scenario.nodes.length) current.status = 'succeeded'; }
+      if(current.aiMode==='live'){
+        current.dialogue={nodeIndex:current.nodeIndex,npcText:grade.npcReply,action:grade.action,cues:grade.cues};
+        if(grade.npcReplySubtitle)current.subtitles={...current.subtitles,[grade.npcReply]:grade.npcReplySubtitle};
+      }
       if (['succeeded', 'failed'].includes(current.status)) finish(p, current);
       const response: TurnResponse = { turn, session: publicPlay(current), result: current.result,
         oopsMoment: { triggered: lifeDelta < 0, lifeDelta, assetKey: `characters/${current.scenario.characterId}/${current.emotion}` }, mistakeId };

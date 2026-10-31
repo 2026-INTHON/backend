@@ -34,7 +34,7 @@ test('Durable generation resumes checkpoints, migrates ownership, publishes only
   assert.equal((await api('/sessions',{sceneId:privateScene},c.accessToken)).status,404);
   const play=(await api('/sessions',{sceneId:privateScene,aiMode:'mock'},b.accessToken)).data;assert.equal(play.aiMode,'live');
   let last;
-  for(let i=0;i<8;i++){last=await api('/sessions/'+play.id+'/turns',{clientTurnId:'t'+i,inputType:'text',text:'교수님, 정중히 부탁드립니다.'},b.accessToken);assert.equal(last.status,200);if(i===3)assert.equal(last.data.session.npc.text,'고려 경로 대사');}
+  for(let i=0;i<8;i++){last=await api('/sessions/'+play.id+'/turns',{clientTurnId:'t'+i,inputType:'text',text:'교수님, 정중히 부탁드립니다.'},b.accessToken);assert.equal(last.status,200);if(i===3){assert.equal(last.data.session.branchId,'considerate');assert.equal(last.data.session.npc.text,last.data.turn.npcReply);assert.notEqual(last.data.session.npc.text,'고려 경로 대사');}}
   assert.equal(last!.data.result.passed,true);assert.equal(last!.data.result.ending.id,'deferred');assert.equal(last!.data.result.nextSceneId,job.id+'-2');
   assert.equal(last!.data.turn.isMock,false);assert.equal(last!.data.turn.evaluation.mark,'△');assert.equal(last!.data.turn.mark,'△');assert.equal(last!.data.result.score,65);
   assert.equal(last!.data.result.report.status,'queued');await workOne();

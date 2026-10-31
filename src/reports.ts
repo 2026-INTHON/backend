@@ -29,7 +29,12 @@ export async function retry(ownerId:string,sessionId:string){const resource=awai
 
 function transcript(play:Play){
  let index=0;
- return play.history.map(turn=>{const node=activeNode({...play,nodeIndex:index});if(turn.outcome==='correct')index++;return {turn,node};});
+ return play.history.map(turn=>{
+  const saved=play.scenario.nodes.findIndex(node=>node.id===turn.nodeId);
+  const base=activeNode({...play,nodeIndex:saved>=0?saved:index,dialogue:undefined});
+  const node=turn.prompt?{...base,npcText:turn.prompt.text,action:turn.prompt.action,cues:turn.prompt.cues}:base;
+  if(turn.outcome==='correct')index++;return {turn,node};
+ });
 }
 function coachInput(play:Play){
  const entries=transcript(play),ids=[...new Set(entries.map(e=>e.node.id))];
