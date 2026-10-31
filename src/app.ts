@@ -109,6 +109,16 @@ endpoint({ method: 'get', path: '/me', tag: 'Home', summary: '내 계정', outpu
 endpoint({ method: 'get', path: '/home', tag: 'Home', summary: '이어하기·오늘의 장면·재화·출석 팝업', output: C.Home, run: (_, __, p) => Game.home(p!) });
 endpoint({ method: 'get', path: '/packs', tag: 'Catalog', summary: '현재 이용 가능한 학습 팩', auth: false, output: z.array(feature), run: () => packs.filter(pack => pack.id === 'ko') });
 endpoint({ method: 'get', path: '/characters', tag: 'Catalog', summary: '4명 캐릭터와 각 3가지 성격', auth: false, output: z.array(C.Character), run: () => Content.characters() });
+endpoint({method:'get',path:'/characters/{characterId}/personalities/{personalityId}/profile',tag:'Catalog',summary:'성격별 짧은 프로필 항목 — 선택 언어 번역',auth:false,
+  params:z.object({characterId:z.string(),personalityId:z.string()}),query:z.object({language:C.SubtitleLanguage.optional()}),
+  output:z.object({characterId:z.string(),personalityId:z.string(),personalityName:z.string(),language:C.SubtitleLanguage,revision:z.string(),profile:C.CharacterCardProfile}),
+  run:async c=>{const characterId=c.req.param('characterId')!,personalityId=c.req.param('personalityId')!,language=C.SubtitleLanguage.parse(c.req.query('language')||'ko');
+    const selected=await Content.persona(characterId,personalityId),profile=selected.personality.cardProfile;
+    if(!profile)throw new ApiError('PROFILE_NOT_FOUND','등록된 프로필이 없어요.',404);
+    const tr=language==='ko'?{}:await translations([selected.personality.name,profile.occupation,profile.age,...profile.hobbies,...profile.favoriteFoods,...profile.dislikes,...profile.currentInterests],language);
+    const text=(value:string)=>language==='ko'?value:tr[value];
+    return {characterId,personalityId,personalityName:text(selected.personality.name),language,revision:selected.revision||'',profile:{...profile,occupation:text(profile.occupation),age:text(profile.age),hobbies:profile.hobbies.map(text),favoriteFoods:profile.favoriteFoods.map(text),dislikes:profile.dislikes.map(text),currentInterests:profile.currentInterests.map(text)}};
+  }});
 endpoint({ method: 'get', path: '/chapters', tag: 'Catalog', summary: '캐릭터별 챕터·성격별 서브 챕터와 내 진행 상태',
   query: z.object({ pack: C.Pack.optional(), characterId: z.string().optional(), language:C.SubtitleLanguage.optional() }), output: z.array(C.Chapter),
   run: async (c, _, p) => {const pack=c.req.query('pack')||'ko';requireKorean(pack);return localizedChapters(await Game.chapters(p!, 'ko', c.req.query('characterId')), C.SubtitleLanguage.optional().parse(c.req.query('language')));} });

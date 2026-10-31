@@ -196,9 +196,10 @@ export async function submitTurn(id: string, sessionId: string, input: TurnInput
   const { play, text, metrics } = reservation.value;
   try {
     const imageOptions=(await CharacterImages.variants('')).filter(i=>i.characterId===play!.scenario.characterId&&i.imageUrl).map(({assetKey,emotion,gesture,label,reaction,pose,useWhen,tags,endingPreferred})=>({assetKey,emotion,gesture,label:label||'',reaction:reaction||'',pose:pose||'',useWhen:useWhen||'',tags:tags||[],endingPreferred:endingPreferred||false}));
-    const grade = await evaluate(play!.scenario, activeNode(play!), text!, play!.aiMode, metrics, play!.history.map(t => ({ user: t.text, npc: t.npcReply })), play!.nodeIndex===play!.scenario.branchAt ? (play!.scenario.routes||[]).map(r=>r.id) : [], play!.nodeIndex===play!.scenario.nodes.length-1 ? (play!.scenario.endings||[]).map(e=>e.id) : [],play!.subtitleLanguage||'en',imageOptions,play!.lives,nextCheckpoint(play!));
+    const closingAllowed=play!.nodeIndex>=Math.max(1,play!.scenario.nodes.length-2);
+    const grade = await evaluate(play!.scenario, activeNode(play!), text!, play!.aiMode, metrics, play!.history.map(t => ({ user: t.text, npc: t.npcReply })), play!.nodeIndex===play!.scenario.branchAt ? (play!.scenario.routes||[]).map(r=>r.id) : [], closingAllowed ? (play!.scenario.endings||[]).map(e=>e.id) : [],play!.subtitleLanguage||'en',imageOptions,play!.lives,nextCheckpoint(play!),closingAllowed);
     const assessment=assess(grade),failed=play!.lives<=1&&assessment.outcome==='misunderstanding';
-    const lastSuccess=assessment.progression==='advance'&&play!.nodeIndex===play!.scenario.nodes.length-1;
+    const lastSuccess=assessment.progression==='advance'&&(grade.conversationComplete||play!.nodeIndex===play!.scenario.nodes.length-1);
     const badEnding=failed||(lastSuccess&&play!.scenario.endings?.some(e=>e.id===grade.endingId&&e.kind==='bad'))||false;
     grade.emotion=CharacterImages.endingEmotion(grade.emotion,badEnding,failed);
     const selectedImage=await CharacterImages.render('',play!.scenario.characterId,grade.emotion,grade.gesture,grade.imageAssetKey,failed||(badEnding&&grade.endingId!=='deferred'));
@@ -231,7 +232,7 @@ export async function submitTurn(id: string, sessionId: string, input: TurnInput
           category: outcome === 'misunderstanding' ? 'politeness' : 'clarity', pack: current.scenario.pack, practiceCount: 0, resolved: false, createdAt: now(), nodeIndex: current.nodeIndex, scenario: {...current.scenario,nodes:current.scenario.nodes.map((n,i)=>i===current.nodeIndex?node:n)}, practiceRequests: {} });
       }
       if (current.lives <= 0) current.status = 'failed';
-      else if (outcome === 'correct') { if(current.nodeIndex===current.scenario.branchAt) current.branchId=current.scenario.routes?.some(r=>r.id===grade.routeId)?grade.routeId??undefined:current.scenario.routes?.[0]?.id; if(current.nodeIndex===current.scenario.nodes.length-1)current.endingId=current.scenario.endings?.some(e=>e.id===grade.endingId)?grade.endingId??'happy':'happy'; current.nodeIndex++; if (current.nodeIndex === current.scenario.nodes.length) current.status = 'succeeded'; }
+      else if (outcome === 'correct') { if(current.nodeIndex===current.scenario.branchAt) current.branchId=current.scenario.routes?.some(r=>r.id===grade.routeId)?grade.routeId??undefined:current.scenario.routes?.[0]?.id; if(lastSuccess)current.endingId=current.scenario.endings?.some(e=>e.id===grade.endingId)?grade.endingId??'happy':'happy'; current.nodeIndex=lastSuccess?current.scenario.nodes.length:current.nodeIndex+1; if (current.nodeIndex === current.scenario.nodes.length) current.status = 'succeeded'; }
       if(current.aiMode==='live'){
         current.dialogue={nodeIndex:current.nodeIndex,npcText:grade.npcReply,action:grade.action,cues:grade.cues};
         if(grade.npcReplySubtitle)current.subtitles={...current.subtitles,[grade.npcReply]:grade.npcReplySubtitle};

@@ -14,7 +14,8 @@ export const CharacterProfile = z.object({
   values:z.array(z.string()),traits:z.array(z.string()),likes:z.array(z.string()),dislikes:z.array(z.string()),hobbies:z.array(z.string()),
   speakingStyle:z.string(),sampleLines:z.array(z.string()),
 }).openapi('CharacterProfile');
-export const Personality = z.object({ id: z.string(), name: z.string(), description: z.string(), assetKey: z.string(), clientKey:z.string().optional(), short:z.string().optional(), level:z.string().optional(),profile:CharacterProfile.optional(),profileRevision:z.string().optional() }).openapi('Personality');
+export const CharacterCardProfile = z.object({name:z.string(),occupation:z.string(),age:z.string(),hobbies:z.array(z.string()),favoriteFoods:z.array(z.string()),dislikes:z.array(z.string()),currentInterests:z.array(z.string())}).openapi('CharacterCardProfile');
+export const Personality = z.object({ id: z.string(), name: z.string(), description: z.string(), assetKey: z.string(), clientKey:z.string().optional(), short:z.string().optional(), level:z.string().optional(),profile:CharacterProfile.optional(),cardProfile:CharacterCardProfile.optional(),profileRevision:z.string().optional() }).openapi('Personality');
 export const Character = z.object({ id: z.string(), name: z.string(), role: z.string(), description: z.string(), emoji: z.string(), assetKey: z.string(), personalities: z.array(Personality), clientKey:z.string().optional(), call:z.string().optional(), free:z.boolean().optional(), imageUrl:z.string().optional(), cardUrl:z.string().optional() }).openapi('Character');
 export const Choice = z.object({ id: z.string(), text: z.string() }).openapi('Choice');
 export const Cue = z.object({ k: z.enum(['표정', '억양', '망설임', '침묵']), v: z.string().trim().min(1).max(400) }).openapi('NonverbalCue');
