@@ -1,7 +1,7 @@
 import {z,Emotion,Gesture,CharacterRender} from './contracts';
 import {personaAssets} from './ai';
 import * as Content from './content';
-export const Variant=z.object({assetKey:z.string(),characterId:z.string(),emotion:Emotion,gesture:Gesture,imageUrl:z.string().nullable(),label:z.string().optional(),reaction:z.string().optional(),pose:z.string().optional(),useWhen:z.string().optional(),tags:z.array(z.string()).optional(),defaultForEmotion:z.boolean().optional(),source:z.string().optional()});
+export const Variant=z.object({assetKey:z.string(),characterId:z.string(),emotion:Emotion,gesture:Gesture,imageUrl:z.string().nullable(),label:z.string().optional(),reaction:z.string().optional(),pose:z.string().optional(),useWhen:z.string().optional(),tags:z.array(z.string()).optional(),defaultForEmotion:z.boolean().optional(),endingPreferred:z.boolean().optional(),source:z.string().optional()});
 type ImageVariant=z.infer<typeof Variant>;
 let cache:{until:number;items:ImageVariant[]}|undefined;
 const absolute=(base:string,url:string|null)=>url?(url.startsWith('https://')||url.startsWith('http://')?url:base+url):null;
@@ -27,13 +27,17 @@ export async function variants(base:string){
  cache={until:Date.now()+60000,items};
  return items.map(i=>({...i,imageUrl:absolute(base,i.imageUrl)}));
 }
-export function choose(items:ImageVariant[],characterId:string,emotion:string,gesture:string,preferred?:string|null){
- const own=items.filter(i=>i.characterId===characterId&&i.imageUrl),same=own.filter(i=>i.emotion===emotion);
+export function endingEmotion(emotion:z.infer<typeof Emotion>,badEnding:boolean,failed:boolean){
+ return badEnding&&!['angry','sad'].includes(emotion)?failed?'angry' as const:'sad' as const:emotion;
+}
+export function choose(items:ImageVariant[],characterId:string,emotion:string,gesture:string,preferred?:string|null,badEnding=false){
+ const own=items.filter(i=>i.characterId===characterId&&i.imageUrl),matching=own.filter(i=>i.emotion===emotion);
+ const ending=matching.filter(i=>i.endingPreferred),same=badEnding&&ending.length?ending:matching;
  const best=(list:ImageVariant[])=>list.find(i=>i.defaultForEmotion)||list[0];
  return same.find(i=>i.assetKey===preferred)||best(same.filter(i=>i.gesture===gesture))||best(same)||best(own.filter(i=>i.emotion==='neutral'))||null;
 }
-export async function render(base:string,characterId:string,emotion:string,gesture:string,preferred?:string|null):Promise<z.infer<typeof CharacterRender>>{
- const selected=choose(await variants(base),characterId,emotion,gesture,preferred);
+export async function render(base:string,characterId:string,emotion:string,gesture:string,preferred?:string|null,badEnding=false):Promise<z.infer<typeof CharacterRender>>{
+ const selected=choose(await variants(base),characterId,emotion,gesture,preferred,badEnding);
  if(selected)return {...selected,requestedEmotion:emotion,requestedGesture:gesture};
  const character=(await Content.characters()).find(c=>c.id===characterId);
  return {assetKey:`characters/${characterId}/neutral`,characterId,emotion:'neutral',gesture:'idle',imageUrl:absolute(base,character?.imageUrl||null),requestedEmotion:emotion,requestedGesture:gesture};

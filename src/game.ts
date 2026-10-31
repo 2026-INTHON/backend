@@ -104,10 +104,11 @@ function finish(p: Profile, play: Play) {
   const passed = play.status === 'succeeded';
   const quality=good.reduce((sum,t)=>sum+(t.evaluation?.mark==='△'?.65:1),0);
   const rewardCoins = passed ? 30 : 5;
+  const ending=play.scenario.endings?.find(e=>e.id===(play.status==='failed'?'breakdown':play.endingId||'happy'));
   play.result = { sessionId: play.id,report:null, passed, score: Math.max(0, Math.min(100, Math.round((quality / play.scenario.nodes.length) * 100 - bad.length * 8 - play.hintsUsed * 2))),
     goodUtterances: good.filter(t=>t.evaluation?.mark!=='△').map(t => ({ text: t.text, reason: t.feedback.reason })),
     improvableUtterances: play.history.filter(t => t.outcome !== 'correct'||t.evaluation?.mark==='△').map(t => ({ text: t.text, betterExpression: t.feedback.betterExpression, reason: t.feedback.reason, mistakeId: p.state.mistakes.find(m => m.turnId === t.id)?.id || null })),
-    rewardCoins, durationMs: Date.now() - Date.parse(play.createdAt), nextSceneId: play.scenario.nextSceneId ?? null, ending: play.scenario.endings?.find(e=>e.id===(play.status==='failed'?'breakdown':play.endingId||'happy')) ?? null,
+    rewardCoins, durationMs: Date.now() - Date.parse(play.createdAt), nextSceneId: play.scenario.nextSceneId ?? null, ending: ending?{...ending,emotion:play.emotion,render:play.history.at(-1)?.render||null}:null,
     achievement: {
       reach: Math.round(good.length / play.scenario.nodes.length * 100),
       infer: Math.max(30, 100 - (play.hintKeys || []).filter(k => k.endsWith(':1')).length * 15 - ((play.hintKeys || []).filter(k => k.endsWith(':2')).length + Math.max(0, play.hintsUsed - (play.hintKeys || []).length)) * 25),
@@ -151,13 +152,16 @@ export async function submitTurn(id: string, sessionId: string, input: TurnInput
   if (reservation.value.response) return reservation.value.response;
   const { play, text, metrics } = reservation.value;
   try {
-    const imageOptions=(await CharacterImages.variants('')).filter(i=>i.characterId===play!.scenario.characterId&&i.imageUrl).map(({assetKey,emotion,gesture,label,reaction,pose,useWhen,tags})=>({assetKey,emotion,gesture,label:label||'',reaction:reaction||'',pose:pose||'',useWhen:useWhen||'',tags:tags||[]}));
-    const grade = await evaluate(play!.scenario, activeNode(play!), text!, play!.aiMode, metrics, play!.history.map(t => ({ user: t.text, npc: t.npcReply })), play!.nodeIndex===play!.scenario.branchAt ? (play!.scenario.routes||[]).map(r=>r.id) : [], play!.nodeIndex===play!.scenario.nodes.length-1 ? (play!.scenario.endings||[]).map(e=>e.id) : [],play!.subtitleLanguage||'en',imageOptions);
-    const selectedImage=await CharacterImages.render('',play!.scenario.characterId,grade.emotion,grade.gesture,grade.imageAssetKey);
+    const imageOptions=(await CharacterImages.variants('')).filter(i=>i.characterId===play!.scenario.characterId&&i.imageUrl).map(({assetKey,emotion,gesture,label,reaction,pose,useWhen,tags,endingPreferred})=>({assetKey,emotion,gesture,label:label||'',reaction:reaction||'',pose:pose||'',useWhen:useWhen||'',tags:tags||[],endingPreferred:endingPreferred||false}));
+    const grade = await evaluate(play!.scenario, activeNode(play!), text!, play!.aiMode, metrics, play!.history.map(t => ({ user: t.text, npc: t.npcReply })), play!.nodeIndex===play!.scenario.branchAt ? (play!.scenario.routes||[]).map(r=>r.id) : [], play!.nodeIndex===play!.scenario.nodes.length-1 ? (play!.scenario.endings||[]).map(e=>e.id) : [],play!.subtitleLanguage||'en',imageOptions,play!.lives);
+    const assessment=assess(grade),failed=play!.lives<=1&&assessment.outcome==='misunderstanding';
+    const lastSuccess=assessment.progression==='advance'&&play!.nodeIndex===play!.scenario.nodes.length-1;
+    const badEnding=failed||(lastSuccess&&play!.scenario.endings?.some(e=>e.id===grade.endingId&&e.kind==='bad'))||false;
+    grade.emotion=CharacterImages.endingEmotion(grade.emotion,badEnding,failed);
+    const selectedImage=await CharacterImages.render('',play!.scenario.characterId,grade.emotion,grade.gesture,grade.imageAssetKey,badEnding&&grade.endingId!=='deferred');
     const { value } = await mutate(id, p => {
       const current = getPlay(p, sessionId), stored = current.turns.find(t => t.id === turnId);
       if (!stored || stored.status !== 'pending' || current.nodeIndex !== play!.nodeIndex) throw new ApiError('TURN_SUPERSEDED', '장면 상태가 바뀌었어요. 다시 확인해 주세요.', 409, true);
-      const assessment=assess(grade);
       const outcome=assessment.outcome;
       const lifeDelta = outcome === 'misunderstanding' ? -1 : 0;
       const node = activeNode(current);
@@ -220,3 +224,4 @@ export async function transcribe(id: string, file: File, pack: 'ko' | 'en') {
   await mutate(id, p => { p.state.speechDrafts = p.state.speechDrafts.filter(d => Date.parse(d.expiresAt) > Date.now()).slice(-9); p.state.speechDrafts.push(speech); });
   return { transcriptId: speech.id, text: speech.text, audioMetrics: speech.metrics, expiresAt: speech.expiresAt, editable: true as const };
 }
+

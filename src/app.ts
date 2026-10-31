@@ -67,7 +67,7 @@ function endpoint<I extends C.z.ZodType = C.z.ZodObject, O extends C.z.ZodType =
     const base=(process.env.MALO_PUBLIC_BASE_URL||new URL(c.req.url).origin).replace(/\/$/,'');
     const outputSchema:unknown=e.output;
     if(outputSchema===C.Session){const session=value as C.SessionValue;session.npc.render=await CharacterImages.render(base,session.characterId,session.npc.emotion,session.npc.gesture||'idle',session.npc.assetKey);session.npc.assetKey=session.npc.render.assetKey;}
-    if(outputSchema===C.TurnResult){const result=value as C.z.infer<typeof C.TurnResult>;result.session.npc.render=await CharacterImages.render(base,result.session.characterId,result.session.npc.emotion,result.session.npc.gesture||'idle',result.session.npc.assetKey);result.session.npc.assetKey=result.session.npc.render.assetKey;result.turn.render=await CharacterImages.render(base,result.session.characterId,result.turn.emotion,result.turn.gesture||'idle',result.turn.render?.assetKey);result.oopsMoment.assetKey=result.turn.render.assetKey;}
+    if(outputSchema===C.TurnResult){const result=value as C.z.infer<typeof C.TurnResult>;result.session.npc.render=await CharacterImages.render(base,result.session.characterId,result.session.npc.emotion,result.session.npc.gesture||'idle',result.session.npc.assetKey);result.session.npc.assetKey=result.session.npc.render.assetKey;result.turn.render=await CharacterImages.render(base,result.session.characterId,result.turn.emotion,result.turn.gesture||'idle',result.turn.render?.assetKey,result.session.status==='failed'||result.result?.ending?.id==='breakdown');result.oopsMoment.assetKey=result.turn.render.assetKey;}
     const data=e.output.parse(value);
     return c.json({ data, meta: { requestId: c.get('requestId'), apiVersion: 'v1' as const } }, 200) as never;
   });
@@ -197,3 +197,4 @@ app.post('/internal/generation-worker',async c=>{const expected=process.env.MALO
 export const documentConfig = { openapi: '3.1.0' as const, info: { title: 'Malo Backend API', version: '0.1.0', description: 'React Native + Expo FE용 API. 기본 Mock 채점, 선택 시 Live AI. Guest 영속 저장 및 Google 회원 이관. 상점/구독은 화면용 데이터만 제공합니다.' }, servers: [{ url: '/', description: '현재 서버' }], security: [] };
 app.doc31('/openapi.json', documentConfig);
 app.get('/docs', swaggerUI({ url: '/api/v1/openapi.json', persistAuthorization: false }));
+
