@@ -1,10 +1,11 @@
-import { z, Cue, Perspective } from './contracts';
+import {assess} from './reaction';
+import { z, Cue, Perspective, Gesture } from './contracts';
 import { characters, learningSupport, type Scenario, type SceneNode } from './catalog';
 import type { MetricsValue } from './contracts';
 import { ApiError } from './errors';
 
 export const Grade = z.object({ outcome: z.enum(['correct', 'misunderstanding', 'clarify']), confidence: z.number().min(0).max(1), toneScore: z.number().min(0).max(100),
-  npcReplySubtitle:z.string().default(''),routeId:z.string().nullable().optional(),endingId:z.string().nullable().optional(),
+  reaction:z.enum(['happy','neutral','angry','sad','confused']).nullable().default(null),goalAchieved:z.boolean().nullable().default(null),reasonSubtitle:z.string().default(''),gesture:Gesture.default('idle'),npcReplySubtitle:z.string().default(''),routeId:z.string().nullable().optional(),endingId:z.string().nullable().optional(),
   native: z.boolean(),
   toneLabel: z.string(), feedback: z.string(), betterExpression: z.string(), reason: z.string(), npcReply: z.string(),
   action: z.string().trim().min(1).max(400), cues: z.array(Cue).min(1).max(5), views: z.array(Perspective).min(2).max(3),
@@ -45,7 +46,7 @@ export async function evaluate(scenario: Scenario, node: SceneNode, text: string
   const grade = result.data;
   // Language help is a retry, even if a provider incorrectly graded it as a clear mistake.
   if (grade.native || isOtherLanguage(text, scenario.pack)) return { ...grade, native: true, outcome: 'clarify' as const };
-  if(grade.outcome==='correct'&&((allowedRoutes.length&&!allowedRoutes.includes(grade.routeId||''))||(allowedEndings.length&&!allowedEndings.includes(grade.endingId||''))))throw new ApiError('STORY_ROUTE_INVALID','이야기 반응을 확인하지 못했어요. 체력 차감 없이 다시 시도해 주세요.',502,true);
+  if(assess(grade).progression==='advance'&&((allowedRoutes.length&&!allowedRoutes.includes(grade.routeId||''))||(allowedEndings.length&&!allowedEndings.includes(grade.endingId||''))))throw new ApiError('STORY_ROUTE_INVALID','이야기 반응을 확인하지 못했어요. 체력 차감 없이 다시 시도해 주세요.',502,true);
   return grade;
 }
 export function isOtherLanguage(text: string, pack: 'ko' | 'en') {
