@@ -1,6 +1,7 @@
 import * as Endings from './endings';
 import { localizedChapters, requireKorean, translations } from './translations';
 import * as Reports from './reports';
+import * as Exports from './exports';
 import {ReportResource} from './report-contracts';
 import * as CharacterImages from './character-images';
 import * as Content from './content';
@@ -76,7 +77,7 @@ function endpoint<I extends C.z.ZodType = C.z.ZodObject, O extends C.z.ZodType =
     return c.json({ data, meta: { requestId: c.get('requestId'), apiVersion: 'v1' as const } }, 200) as never;
   });
 }
-function speechInput(p:Profile,session:C.SessionValue,text:string,turn?:C.TurnValue){return {text,pack:session.pack,characterId:session.characterId,personalityId:session.personalityId,emotion:turn?.emotion||session.npc.emotion,reaction:turn?.render?.reaction||session.npc.render?.reaction,speed:p.state.settings.voiceSpeed};}
+function speechInput(p:Profile,session:C.SessionValue,text:string,turn?:C.TurnValue){return {recoveryStage:turn?turn.affect?.stage||null:session.affect?.stage||null,text,pack:session.pack,characterId:session.characterId,personalityId:session.personalityId,emotion:turn?.emotion||session.npc.emotion,reaction:turn?.render?.reaction||session.npc.render?.reaction,speed:p.state.settings.voiceSpeed};}
 async function speechAsset(c:Context<Env>,p:Profile,input:ReturnType<typeof speechInput>){const audio=await aiRequest('/v1/speech/synthesize',input);const token=await Auth.signAudio(p.id,audio.assetId);const base=(process.env.MALO_PUBLIC_BASE_URL||new URL(c.req.url).origin).replace(/\/$/,'');return {...audio,mimeType:'audio/mpeg' as const,expiresIn:600,audioUrl:`${base}/api/v1/audio/${audio.assetId}?token=${encodeURIComponent(token)}`};}
 async function voiceUrl(c:Context<Env>,p:Profile,text:string,session:C.SessionValue,turn?:C.TurnValue){try{return (await speechAsset(c,p,speechInput(p,session,text,turn))).audioUrl;}catch{return null;}}
 const idParam = z.object({ id: z.string().uuid().openapi({ param: { name: 'id', in: 'path' } }) });
@@ -162,13 +163,26 @@ endpoint({ method: 'post', path: '/sessions/{id}/speech', tag: 'Speech', summary
 
 endpoint({method:'post',path:'/speech/preview',tag:'Speech',summary:'기존 데모 대사·표현 연습의 캐릭터 음성 — 학습 세션을 만들지 않음',
   input:z.object({text:z.string().trim().min(1).max(500),pack:C.Pack.default('ko'),characterId:z.enum(['girlfriend','friend','manager','professor']),personalityId:z.enum(['playful','strict','calm']).default('calm'),emotion:C.Emotion.default('neutral'),reaction:z.string().max(60).optional(),speed:z.number().min(.5).max(1.5).optional()}),output:C.AudioAsset,
-  run:async(c,b,p)=>{limit(`${p!.id}:tts`,20);await Content.persona(b.characterId,b.personalityId);return speechAsset(c,p!,{...b,reaction:b.reaction,speed:b.speed??p!.state.settings.voiceSpeed});}});
+  run:async(c,b,p)=>{limit(`${p!.id}:tts`,20);await Content.persona(b.characterId,b.personalityId);return speechAsset(c,p!,{...b,recoveryStage:null,reaction:b.reaction,speed:b.speed??p!.state.settings.voiceSpeed});}});
 
 endpoint({method:'post',path:'/speech/realtime-session',tag:'Speech',summary:'녹음 중 실시간 전사용 60초 임시 자격증명',input:z.object({pack:C.Pack.default('ko')}),output:z.object({value:z.string(),expiresAt:z.number(),model:z.string(),sampleRate:z.number(),session:z.unknown(),websocketUrl:z.string()}),run:(c,b,p)=>{limit(p!.id+':realtime',2);return aiRequest('/v1/speech/realtime-session',{pack:b.pack,userId:p!.id});}});
 
 endpoint({method:'post',path:'/sessions/{id}/report',tag:'Reports',summary:'완료한 서브챕터의 상세 보고서 생성 예약·재조회',params:idParam,query:z.object({language:C.SubtitleLanguage.optional()}),input:empty,output:ReportResource,run:(c,_,p)=>Reports.ensure(p!.id,c.req.param('id')!,true,c.req.query('language') as any)});
 endpoint({method:'get',path:'/sessions/{id}/report',tag:'Reports',summary:'종합 평가와 대화별 문화 피드백 조회 — 조회 자체는 생성하지 않음',params:idParam,query:z.object({language:C.SubtitleLanguage.optional()}),output:ReportResource,run:(c,_,p)=>Reports.read(p!.id,c.req.param('id')!,c.req.query('language') as any)});
 endpoint({method:'post',path:'/sessions/{id}/report/retry',tag:'Reports',summary:'실패한 상세 보고서만 다시 생성',params:idParam,query:z.object({language:C.SubtitleLanguage.optional()}),input:empty,output:ReportResource,run:(c,_,p)=>{limit(p!.id+':report-retry',3);return Reports.retry(p!.id,c.req.param('id')!,c.req.query('language') as any);}});
+endpoint({method:'get',path:'/sessions/{id}/exports',tag:'Reports',summary:'내 완료 대화의 영상·PDF 준비 상태',params:idParam,query:z.object({language:C.SubtitleLanguage.default('en')}),output:z.array(Exports.ExportView),run:(c,_,p)=>Exports.list(p!.id,c.req.param('id')!,c.req.query('language')||'en')});
+endpoint({method:'post',path:'/sessions/{id}/exports',tag:'Reports',summary:'전체 대화 MP4 또는 상세 보고서 PDF 만들기 — 같은 요청 재사용',params:idParam,input:Exports.ExportInput,output:Exports.ExportView,run:(c,b,p)=>{limit(p!.id+':export',6);return Exports.create(p!.id,c.req.param('id')!,b);}});
+endpoint({method:'post',path:'/exports/{id}/download',tag:'Reports',summary:'내보낸 파일의 10분 유효 다운로드 링크',params:idParam,input:empty,output:z.object({url:z.string(),filename:z.string(),mimeType:z.string(),expiresIn:z.literal(600)}),run:async(c,_,p)=>{const id=c.req.param('id')!,{file}=await Exports.file(p!.id,id),token=await Auth.signExport(p!.id,id);const base=(process.env.MALO_PUBLIC_BASE_URL||new URL(c.req.url).origin).replace(/\/$/,'');return {url:`${base}/api/v1/exports/${id}/file?token=${encodeURIComponent(token)}`,filename:`malo-${id}.${file.mimeType==='video/mp4'?'mp4':'pdf'}`,mimeType:file.mimeType,expiresIn:600 as const};}});
+app.get('/exports/:id/file',async c=>{
+ const id=z.string().uuid().parse(c.req.param('id')),owner=await Auth.verifyExport(c.req.query('token')||'',id),{file}=await Exports.file(owner,id);
+ if(!/^e_[a-f0-9]{40}\.(mp4|pdf)$/.test(file.assetId))throw new ApiError('EXPORT_NOT_FOUND','파일을 찾지 못했어요.',404);
+ const headers:Record<string,string>={'X-AI-Service-Token':process.env.MALO_AI_SERVICE_TOKEN||''};if(c.req.header('Range'))headers.Range=c.req.header('Range')!;
+ const response=await fetch(`${process.env.MALO_AI_URL?.replace(/\/$/,'')}/v1/exports/files/${file.assetId}`,{headers,signal:AbortSignal.timeout(180000)});
+ if(![200,206,416].includes(response.status))throw new ApiError('EXPORT_UNAVAILABLE','파일을 불러오지 못했어요. 다시 시도해 주세요.',502,true);
+ const out=new Headers({'Content-Type':file.mimeType,'Content-Disposition':`attachment; filename="malo-${id}.${file.mimeType==='video/mp4'?'mp4':'pdf'}"`,'Cache-Control':'private, no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff'});
+ for(const key of ['Content-Length','Content-Range','Accept-Ranges'])if(response.headers.has(key))out.set(key,response.headers.get(key)!);
+ return new Response(response.body,{status:response.status,headers:out});
+});
 const uploadRoute = createRoute({ method: 'post', path: '/speech/transcriptions', tags: ['Speech'], summary: '녹음 → 수정 가능한 인식 결과 (제출/채점 전)', security: [{ BearerAuth: [] }],
   request: { body: { required: true, content: { 'multipart/form-data': { schema: z.object({ file: z.custom<File>(value => value instanceof File, '음성 파일이 필요해요.').openapi({ type: 'string', format: 'binary' }), pack: C.Pack.default('ko') }) } } } },
   responses: { 200: { description: '음성 인식 완료, text 수정 후 turns에 제출', content: { 'application/json': { schema: C.envelope(C.SpeechDraft) } } }, 422: { description: '인식 실패 — 체력 차감 없음', content: { 'application/json': { schema: C.ErrorBody } } } } });

@@ -1,12 +1,12 @@
 import {assess} from './reaction';
-import { z, Cue, Perspective, Gesture, RepairAction, type DialogueRepairValue } from './contracts';
+import { z, Cue, Perspective, Gesture, RepairAction, type DialogueRepairValue, type AffectValue } from './contracts';
 import { characters, learningSupport, type Scenario, type SceneNode } from './catalog';
 import type { MetricsValue } from './contracts';
 import { ApiError } from './errors';
 import { personaPrompt } from './personas';
 import {initialSpeechLevel,mentionsSpeechLevel,type SpeechLevel} from './dialogue';
 
-export const Grade = z.object({ repairAction:RepairAction.default('none'),repairIssue:z.string().max(400).default(''),npcSpeechLevel:z.enum(['polite','casual']).nullable().default(null),conversationComplete:z.boolean().default(false), outcome: z.enum(['correct', 'misunderstanding', 'clarify']), confidence: z.number().min(0).max(1), toneScore: z.number().min(0).max(100),
+export const Grade = z.object({ offenseSeverity:z.enum(['mild','serious','severe']).default('serious'),repairAction:RepairAction.default('none'),repairIssue:z.string().max(400).default(''),npcSpeechLevel:z.enum(['polite','casual']).nullable().default(null),conversationComplete:z.boolean().default(false), outcome: z.enum(['correct', 'misunderstanding', 'clarify']), confidence: z.number().min(0).max(1), toneScore: z.number().min(0).max(100),
   imageAssetKey:z.string().nullable().default(null),evaluationMark:z.enum(['O','△','X','?']).nullable().default(null),reaction:z.enum(['happy','neutral','angry','sad','confused']).nullable().default(null),goalAchieved:z.boolean().nullable().default(null),reasonSubtitle:z.string().default(''),gesture:Gesture.default('idle'),npcReplySubtitle:z.string().default(''),routeId:z.string().nullable().optional(),endingId:z.string().nullable().optional(),
   native: z.boolean(),
   toneLabel: z.string(), feedback: z.string(), betterExpression: z.string(), reason: z.string(), npcReply: z.string(),
@@ -17,7 +17,7 @@ export async function aiRequest(path: string, body?: unknown, form?: FormData) {
   try {
     const response = await fetch(process.env.MALO_AI_URL.replace(/\/$/, '') + path, {
       method: 'POST', headers: { 'X-AI-Service-Token': process.env.MALO_AI_SERVICE_TOKEN || '', ...(form ? {} : { 'Content-Type': 'application/json' }) },
-      body: form || JSON.stringify(body), signal: AbortSignal.timeout((path.startsWith('/v1/chapters/')||path.startsWith('/v1/reports/'))?240000:95000),
+      body: form || JSON.stringify(body), signal: AbortSignal.timeout((path.startsWith('/v1/chapters/')||path.startsWith('/v1/reports/')||path.startsWith('/v1/exports/'))?240000:95000),
     });
     const data = await response.json();
     if (!response.ok) throw new ApiError(data.error?.code || 'AI_UNAVAILABLE', data.error?.message || 'AI 연결에 실패했어요. 다시 시도해 주세요.', response.status, data.error?.retryable ?? true);
@@ -27,7 +27,7 @@ export async function aiRequest(path: string, body?: unknown, form?: FormData) {
     throw new ApiError('AI_UNAVAILABLE', 'AI 연결에 실패했어요. 체력 차감 없이 다시 시도해 주세요.', 502, true);
   }
 }
-export async function evaluate(scenario: Scenario, node: SceneNode, text: string, mode: 'mock' | 'live', metrics: MetricsValue | null = null, history: { user: string; npc: string }[] = [], allowedRoutes:string[]=[], allowedEndings:string[]=[],subtitleLanguage:string='en',imageOptions:unknown[]=[],livesRemaining=3,nextCheckpoint:{goal:string;draftLine:string;routeLines:Record<string,string>}|null=null,closingAllowed=false,npcSpeechLevel:SpeechLevel=initialSpeechLevel(scenario.nodes[0].npcText),repair:DialogueRepairValue|null=null ) {
+export async function evaluate(scenario: Scenario, node: SceneNode, text: string, mode: 'mock' | 'live', metrics: MetricsValue | null = null, history: { user: string; npc: string }[] = [], allowedRoutes:string[]=[], allowedEndings:string[]=[],subtitleLanguage:string='en',imageOptions:unknown[]=[],livesRemaining=3,nextCheckpoint:{goal:string;draftLine:string;routeLines:Record<string,string>}|null=null,closingAllowed=false,npcSpeechLevel:SpeechLevel=initialSpeechLevel(scenario.nodes[0].npcText),repair:DialogueRepairValue|null=null,affect:AffectValue|null=null ) {
   const support = learningSupport(scenario, node);
   const allowSpeechLevelChange=mentionsSpeechLevel(text)||mentionsSpeechLevel(node.npcText);
   if (mode === 'mock') {
@@ -45,7 +45,7 @@ export async function evaluate(scenario: Scenario, node: SceneNode, text: string
   }
   const result = Grade.safeParse(await aiRequest('/v1/turns/evaluate', { mode, pack: scenario.pack, characterId: scenario.characterId, personalityId: scenario.personalityId,
     persona:personaPrompt(scenario.characterId,scenario.personalityId),
-    situation: scenario.situation, node: { ...node, ...support }, text, history: history.slice(-12), audioMetrics: metrics,allowedRoutes:repair?[]:allowedRoutes,allowedEndings:repair?[]:allowedEndings,subtitleLanguage,imageOptions,livesRemaining,nextCheckpoint:repair?null:nextCheckpoint,closingAllowed:closingAllowed&&!repair,npcSpeechLevel,allowSpeechLevelChange,repair }));
+    situation: scenario.situation, node: { ...node, ...support }, text, history: history.slice(-12), audioMetrics: metrics,allowedRoutes:repair?[]:allowedRoutes,allowedEndings:repair?[]:allowedEndings,subtitleLanguage,imageOptions,livesRemaining,nextCheckpoint:repair?null:nextCheckpoint,closingAllowed:closingAllowed&&!repair,npcSpeechLevel,allowSpeechLevelChange,repair,affect }));
   if (!result.success) throw new ApiError('AI_RESPONSE_INVALID', 'AI 응답을 확인하지 못했어요. 체력 차감 없이 다시 시도해 주세요.', 502, true);
   const grade = result.data;
   grade.npcSpeechLevel=allowSpeechLevelChange?(grade.npcSpeechLevel||npcSpeechLevel):npcSpeechLevel;

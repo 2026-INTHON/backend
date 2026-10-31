@@ -1,4 +1,5 @@
 import {processReport} from './reports';
+import {processExport} from './exports';
 import { createHash, randomUUID } from 'node:crypto';
 import { aiRequest } from './ai';
 import { rows, put, claimJob, patchJob, publishChapter, retryJob } from './content-db';
@@ -35,7 +36,7 @@ export async function enqueueCurriculum(){const out=[];for(const c of curriculum
 // One provider step per claim: persisted checkpoints survive page closure and process restart.
 export async function workOne(){
   const worker=randomUUID(),j=await claimJob(worker);if(!j)return {worked:false};
-  if(j.kind==='report')return processReport(j,worker);
+  if(j.kind==='report')return 'exportFormat' in j.request?processExport(j,worker):processReport(j,worker);
   const cp=j.checkpoint;
   const {clientRequestId:_,catalogId:__,...request}=j.request;
   try{
