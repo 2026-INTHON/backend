@@ -6,7 +6,8 @@ export type StoredTurn = { id: string; clientTurnId: string; inputHash: string; 
 export type Play = {
   speechLevel?:import('./dialogue').SpeechLevel;
   id: string; sceneId: string; scenario: Scenario; aiMode: 'mock' | 'live'; status: 'active' | 'paused' | 'succeeded' | 'failed' | 'abandoned';
-  imageAssetKey?:string; detailedReport?:DetailedReportValue; gesture?:'idle'|'nod'|'tilt'|'thinking'|'open_hand'|'arms_crossed'; subtitleLanguage?:'en'|'ja'|'zh'|'vi'|'es'|'id'|'ko'; subtitles?:Record<string,string>; branchId?:string; endingId?:string; lives: number; nodeIndex: number; hintsUsed: number; hintKeys?: string[]; emotion: 'neutral' | 'happy' | 'confused' | 'sad' | 'angry';
+  imageAssetKey?:string; detailedReports?:Record<string,DetailedReportValue>;
+  detailedReport?:DetailedReportValue; gesture?:'idle'|'nod'|'tilt'|'thinking'|'open_hand'|'arms_crossed'; subtitleLanguage?:'en'|'ja'|'zh'|'vi'|'es'|'id'|'ko'; subtitles?:Record<string,string>; branchId?:string; endingId?:string; lives: number; nodeIndex: number; hintsUsed: number; hintKeys?: string[]; emotion: 'neutral' | 'happy' | 'confused' | 'sad' | 'angry';
   turns: StoredTurn[]; history: TurnValue[]; result: ResultValue | null; createdAt: string; updatedAt: string;
   dialogue?: {nodeIndex:number; npcText:string; action:string; cues:TurnValue['cues']};
 };

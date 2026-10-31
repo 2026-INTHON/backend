@@ -7580,6 +7580,23 @@
             "required": true,
             "name": "id",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "en",
+                "ja",
+                "zh",
+                "vi",
+                "es",
+                "id",
+                "ko"
+              ]
+            },
+            "required": false,
+            "name": "language",
+            "in": "query"
           }
         ],
         "requestBody": {
@@ -7674,7 +7691,8 @@
                             "policyVersion": {
                               "type": "string",
                               "enum": [
-                                "report-v1-draft"
+                                "report-v1-draft",
+                                "report-v2-concise"
                               ]
                             },
                             "provisional": {
@@ -7759,12 +7777,20 @@
                                 "headline": {
                                   "type": "string",
                                   "minLength": 1,
-                                  "maxLength": 200
+                                  "maxLength": 80
                                 },
                                 "overallFeedback": {
                                   "type": "string",
                                   "minLength": 1,
-                                  "maxLength": 1200
+                                  "maxLength": 240
+                                },
+                                "shortcomings": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "maxItems": 2,
+                                  "default": []
                                 },
                                 "strengths": {
                                   "type": "array",
@@ -7811,6 +7837,35 @@
                               "items": {
                                 "type": "object",
                                 "properties": {
+                                  "coaching": {
+                                    "type": "object",
+                                    "properties": {
+                                      "strengths": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        },
+                                        "maxItems": 2,
+                                        "default": []
+                                      },
+                                      "improvements": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        },
+                                        "maxItems": 2,
+                                        "default": []
+                                      },
+                                      "shortcomings": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        },
+                                        "maxItems": 2,
+                                        "default": []
+                                      }
+                                    }
+                                  },
                                   "turnId": {
                                     "type": "string"
                                   },
@@ -8115,6 +8170,23 @@
             "required": true,
             "name": "id",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "en",
+                "ja",
+                "zh",
+                "vi",
+                "es",
+                "id",
+                "ko"
+              ]
+            },
+            "required": false,
+            "name": "language",
+            "in": "query"
           }
         ],
         "responses": {
@@ -8198,7 +8270,8 @@
                             "policyVersion": {
                               "type": "string",
                               "enum": [
-                                "report-v1-draft"
+                                "report-v1-draft",
+                                "report-v2-concise"
                               ]
                             },
                             "provisional": {
@@ -8283,12 +8356,20 @@
                                 "headline": {
                                   "type": "string",
                                   "minLength": 1,
-                                  "maxLength": 200
+                                  "maxLength": 80
                                 },
                                 "overallFeedback": {
                                   "type": "string",
                                   "minLength": 1,
-                                  "maxLength": 1200
+                                  "maxLength": 240
+                                },
+                                "shortcomings": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "maxItems": 2,
+                                  "default": []
                                 },
                                 "strengths": {
                                   "type": "array",
@@ -8335,6 +8416,35 @@
                               "items": {
                                 "type": "object",
                                 "properties": {
+                                  "coaching": {
+                                    "type": "object",
+                                    "properties": {
+                                      "strengths": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        },
+                                        "maxItems": 2,
+                                        "default": []
+                                      },
+                                      "improvements": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        },
+                                        "maxItems": 2,
+                                        "default": []
+                                      },
+                                      "shortcomings": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        },
+                                        "maxItems": 2,
+                                        "default": []
+                                      }
+                                    }
+                                  },
                                   "turnId": {
                                     "type": "string"
                                   },
@@ -8641,6 +8751,23 @@
             "required": true,
             "name": "id",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "en",
+                "ja",
+                "zh",
+                "vi",
+                "es",
+                "id",
+                "ko"
+              ]
+            },
+            "required": false,
+            "name": "language",
+            "in": "query"
           }
         ],
         "requestBody": {
@@ -8735,7 +8862,8 @@
                             "policyVersion": {
                               "type": "string",
                               "enum": [
-                                "report-v1-draft"
+                                "report-v1-draft",
+                                "report-v2-concise"
                               ]
                             },
                             "provisional": {
@@ -8820,12 +8948,20 @@
                                 "headline": {
                                   "type": "string",
                                   "minLength": 1,
-                                  "maxLength": 200
+                                  "maxLength": 80
                                 },
                                 "overallFeedback": {
                                   "type": "string",
                                   "minLength": 1,
-                                  "maxLength": 1200
+                                  "maxLength": 240
+                                },
+                                "shortcomings": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "maxItems": 2,
+                                  "default": []
                                 },
                                 "strengths": {
                                   "type": "array",
@@ -8872,6 +9008,35 @@
                               "items": {
                                 "type": "object",
                                 "properties": {
+                                  "coaching": {
+                                    "type": "object",
+                                    "properties": {
+                                      "strengths": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        },
+                                        "maxItems": 2,
+                                        "default": []
+                                      },
+                                      "improvements": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        },
+                                        "maxItems": 2,
+                                        "default": []
+                                      },
+                                      "shortcomings": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        },
+                                        "maxItems": 2,
+                                        "default": []
+                                      }
+                                    }
+                                  },
                                   "turnId": {
                                     "type": "string"
                                   },
