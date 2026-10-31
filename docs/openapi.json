@@ -1043,6 +1043,9 @@
           "profile": {
             "$ref": "#/components/schemas/CharacterProfile"
           },
+          "cardProfile": {
+            "$ref": "#/components/schemas/CharacterCardProfile"
+          },
           "profileRevision": {
             "type": "string"
           }
@@ -1125,6 +1128,53 @@
           "hobbies",
           "speakingStyle",
           "sampleLines"
+        ]
+      },
+      "CharacterCardProfile": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "occupation": {
+            "type": "string"
+          },
+          "age": {
+            "type": "string"
+          },
+          "hobbies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "favoriteFoods": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "dislikes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "currentInterests": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "occupation",
+          "age",
+          "hobbies",
+          "favoriteFoods",
+          "dislikes",
+          "currentInterests"
         ]
       },
       "Chapter": {
@@ -3728,6 +3778,215 @@
                       "items": {
                         "$ref": "#/components/schemas/Character"
                       }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string"
+                        },
+                        "apiVersion": {
+                          "type": "string",
+                          "enum": [
+                            "v1"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "requestId",
+                        "apiVersion"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/characters/{characterId}/personalities/{personalityId}/profile": {
+      "get": {
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "성격별 짧은 프로필 항목 — 선택 언어 번역",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "characterId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "personalityId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "en",
+                "ja",
+                "zh",
+                "vi",
+                "es",
+                "id",
+                "ko"
+              ]
+            },
+            "required": false,
+            "name": "language",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "characterId": {
+                          "type": "string"
+                        },
+                        "personalityId": {
+                          "type": "string"
+                        },
+                        "personalityName": {
+                          "type": "string"
+                        },
+                        "language": {
+                          "type": "string",
+                          "enum": [
+                            "en",
+                            "ja",
+                            "zh",
+                            "vi",
+                            "es",
+                            "id",
+                            "ko"
+                          ]
+                        },
+                        "revision": {
+                          "type": "string"
+                        },
+                        "profile": {
+                          "$ref": "#/components/schemas/CharacterCardProfile"
+                        }
+                      },
+                      "required": [
+                        "characterId",
+                        "personalityId",
+                        "personalityName",
+                        "language",
+                        "revision",
+                        "profile"
+                      ]
                     },
                     "meta": {
                       "type": "object",
@@ -9372,6 +9631,10 @@
                         "evaluation": {
                           "type": "object",
                           "properties": {
+                            "conversationComplete": {
+                              "type": "boolean",
+                              "default": false
+                            },
                             "outcome": {
                               "type": "string",
                               "enum": [

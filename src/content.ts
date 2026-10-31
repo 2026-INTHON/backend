@@ -57,7 +57,7 @@ let boot:Promise<void>|undefined;
 async function ensure(){ if((await rows('malo_catalog',{kind:'character'})).length)return; boot??=seedCatalog().finally(()=>{boot=undefined;});await boot; }
 export async function characters(){await ensure();return (await rows<Content<CatalogCharacter>>('malo_catalog',{kind:'character'})).map(({document:c})=>({...c,personalities:c.personalities.map(p=>{
   const selected=characterPersona(c.id,p.id);
-  return selected?{...p,name:selected.name,short:selected.short,description:selected.description,profile:selected.profile,profileRevision:selected.revision}:p;
+  return selected?{...p,name:selected.name,short:selected.short,description:selected.description,profile:selected.profile,cardProfile:{...selected.cardProfile,name:c.name},profileRevision:selected.revision}:p;
 })}));}
 export async function scene(id:string,owner?:string):Promise<Scenario|null>{
   await ensure();const publicRow=(await rows<Content<Scenario>>('malo_catalog',{id,kind:'scene'}))[0];if(publicRow)return publicRow.document;
