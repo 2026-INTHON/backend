@@ -5,7 +5,7 @@ export const SubtitleLanguage=z.enum(['en','ja','zh','vi','es','id','ko']);
 export const Pack = z.enum(['ko', 'en']).openapi('Pack');
 export const Emotion = z.enum(['neutral', 'happy', 'confused', 'sad', 'angry']).openapi('Emotion');
 export const Gesture=z.enum(['idle','nod','tilt','thinking','open_hand','arms_crossed']);
-export const CharacterRender=z.object({assetKey:z.string(),characterId:z.string(),emotion:Emotion,gesture:Gesture,imageUrl:z.string().nullable(),requestedEmotion:z.string(),requestedGesture:z.string()}).openapi('CharacterImageRender');
+export const CharacterRender=z.object({assetKey:z.string(),characterId:z.string(),emotion:Emotion,gesture:Gesture,imageUrl:z.string().nullable(),requestedEmotion:z.string(),requestedGesture:z.string(),reaction:z.string().optional(),label:z.string().optional(),pose:z.string().optional()}).openapi('CharacterImageRender');
 export const Settings = z.object({ pack: Pack, voiceSpeed: z.number().min(0.5).max(1.5), subtitles: z.boolean(), notifications: z.boolean() }).openapi('Settings');
 export const User = z.object({ id: z.string().uuid(), kind: z.enum(['guest', 'member']), displayName: z.string(), email: z.string().nullable(), isMock: z.boolean(), createdAt: z.string() }).openapi('User');
 export const Auth = z.object({ accessToken: z.string(), refreshToken: z.string(), expiresIn: z.number(), authProvider: z.enum(['demo', 'supabase']), user: User, migrated: z.boolean() }).openapi('AuthSession');
@@ -46,7 +46,7 @@ export const ReportMeta=z.object({reportId:z.string().uuid(),status:z.enum(['que
 export const Result = z.object({ sessionId: z.string(), report:ReportMeta.nullable().default(null),passed: z.boolean(), score: z.number(),
   goodUtterances: z.array(z.object({ text: z.string(), reason: z.string() })),
   improvableUtterances: z.array(z.object({ text: z.string(), betterExpression: z.string(), reason: z.string(), mistakeId: z.string().nullable() })),
-  ending:z.object({id:z.string(),kind:z.enum(['happy','bad']),title:z.string(),text:z.string()}).nullable().default(null), rewardCoins: z.number(), durationMs: z.number(), nextSceneId: z.string().nullable(),
+  ending:z.object({id:z.string(),kind:z.enum(['happy','bad']),title:z.string(),text:z.string(),emotion:Emotion.optional(),render:CharacterRender.nullable().default(null)}).nullable().default(null), rewardCoins: z.number(), durationMs: z.number(), nextSceneId: z.string().nullable(),
   achievement: z.object({ reach: z.number().min(0).max(100), infer: z.number().min(0).max(100), self: z.number().min(0).max(100) }).nullable().default(null),
 }).openapi('SessionResult');
 export const TurnResult = z.object({ turn: Turn, session: Session, result: Result.nullable(),
