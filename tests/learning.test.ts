@@ -59,7 +59,7 @@ test('Clues, staged hints, language help, correction comparison and achievement 
 
 test('Hints enforce ownership, pause and pending-turn boundaries; {} preserves the old second hint', async () => {
   const a = await guest(), b = await guest();
-  const s = (await request('/sessions', { sceneId: 'en-friend-calm',aiMode:'mock' }, a.accessToken)).data;
+  const s = (await request('/sessions', { sceneId: 'ko-friend-calm',aiMode:'mock' }, a.accessToken)).data;
   assert.equal((await request(`/sessions/${s.id}/hint`, { step: 1 }, b.accessToken)).status, 404);
   const legacy = (await request(`/sessions/${s.id}/hint`, {}, a.accessToken)).data;
   assert.equal(legacy.step, 2); assert.ok(legacy.hiddenThought); assert.ok(legacy.tip);

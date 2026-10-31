@@ -48,3 +48,12 @@ Base: `https://inthon-demo-20261031-dh.koreacentral.cloudapp.azure.com/api/v1`
 - BE: `npm run typecheck`, `npm test`, `npm run spec`, `npm run build`
 - AI: `.venv/Scripts/python.exe -m unittest discover -s tests -v`, `python scripts/export_openapi.py`
 - 핵심 회귀: 1단계 속마음 비공개, 힌트 재조회 중복 차감 없음, 모국어/애매한 답 체력 유지, X→O 첫 답 비교, 중복 턴 재전송, 계정별 격리, 레거시 대본 호환, 챕터 완료 상태, 결과 지표.
+# 2026-11-01: 선택 언어와 연속 대화
+
+- 한국어팩만 새 학습을 시작할 수 있다. `GET /chapters?language=ko|en|ja|zh`는 원본 ID를 보존하고 `translation`을 추가한다. 세션 생성·retry의 `subtitleLanguage`가 브리핑/대사/힌트 번역을 결정한다.
+- 기본 스테이지의 짧은 상황·목표는 `src/data/briefings.json`에서 관리한다. 원래 긴 상황 설명은 AI 문맥으로 유지한다. FE는 소개를 선택 언어로만 표시한다.
+- 실시간 `turn.npcReply`가 그대로 다음 `session.npc.text`가 된다. AI에는 다음 학습 목표와 참고 대사를 보내되 사용자의 실제 말에 이어 답하도록 한다. 학습 판정은 기존 O/△/X/? 규칙을 유지한다.
+- 피드백은 강제 단계가 아니다. FE는 배지만 표시하고 탭했을 때 상세 모달을 연다.
+- `POST /sessions/{id}/correction {turnId}`로 최신 답변의 실제 질문을 복원한다. 세션 소유자/진행 상태/최신 turn을 검증한다. 기록과 체력은 유지하고 점수는 체크포인트별 최종 답변으로 계산한다.
+- `turn.prompt`는 실제로 답한 질문을 저장하며 상세 보고서·오답 재연습의 근거로 사용한다.
+

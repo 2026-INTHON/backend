@@ -26,7 +26,7 @@ export async function aiRequest(path: string, body?: unknown, form?: FormData) {
     throw new ApiError('AI_UNAVAILABLE', 'AI 연결에 실패했어요. 체력 차감 없이 다시 시도해 주세요.', 502, true);
   }
 }
-export async function evaluate(scenario: Scenario, node: SceneNode, text: string, mode: 'mock' | 'live', metrics: MetricsValue | null = null, history: { user: string; npc: string }[] = [], allowedRoutes:string[]=[], allowedEndings:string[]=[],subtitleLanguage:string='en',imageOptions:unknown[]=[],livesRemaining=3 ) {
+export async function evaluate(scenario: Scenario, node: SceneNode, text: string, mode: 'mock' | 'live', metrics: MetricsValue | null = null, history: { user: string; npc: string }[] = [], allowedRoutes:string[]=[], allowedEndings:string[]=[],subtitleLanguage:string='en',imageOptions:unknown[]=[],livesRemaining=3,nextCheckpoint:{goal:string;draftLine:string;routeLines:Record<string,string>}|null=null ) {
   const support = learningSupport(scenario, node);
   if (mode === 'mock') {
     const bad = text === node.choices[2]?.text || /닥쳐|멍청|꺼져|니가 알아서|몰라요|싫어요|shut up|whatever/i.test(text);
@@ -43,7 +43,7 @@ export async function evaluate(scenario: Scenario, node: SceneNode, text: string
   }
   const result = Grade.safeParse(await aiRequest('/v1/turns/evaluate', { mode, pack: scenario.pack, characterId: scenario.characterId, personalityId: scenario.personalityId,
     persona:personaPrompt(scenario.characterId,scenario.personalityId),
-    situation: scenario.situation, node: { ...node, ...support }, text, history: history.slice(-4), audioMetrics: metrics,allowedRoutes,allowedEndings,subtitleLanguage,imageOptions,livesRemaining }));
+    situation: scenario.situation, node: { ...node, ...support }, text, history: history.slice(-4), audioMetrics: metrics,allowedRoutes,allowedEndings,subtitleLanguage,imageOptions,livesRemaining,nextCheckpoint }));
   if (!result.success) throw new ApiError('AI_RESPONSE_INVALID', 'AI 응답을 확인하지 못했어요. 체력 차감 없이 다시 시도해 주세요.', 502, true);
   const grade = result.data;
   // Language help is a retry, even if a provider incorrectly graded it as a clear mistake.
