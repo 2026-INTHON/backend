@@ -4,6 +4,7 @@ import type { MetricsValue, MistakeValue, ResultValue, SettingsValue, TurnValue 
 
 export type StoredTurn = { id: string; clientTurnId: string; inputHash: string; status: 'pending' | 'completed' | 'retryable_error'; response?: TurnResponse; errorCode?: string };
 export type Play = {
+  affect?: import('./contracts').AffectValue | null;
   repair?: import('./contracts').DialogueRepairValue | null;
   speechLevel?:import('./dialogue').SpeechLevel;
   id: string; sceneId: string; scenario: Scenario; aiMode: 'mock' | 'live'; status: 'active' | 'paused' | 'succeeded' | 'failed' | 'abandoned';

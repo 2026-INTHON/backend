@@ -24,6 +24,39 @@
       "PlaySession": {
         "type": "object",
         "properties": {
+          "affect": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "strain": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 6
+              },
+              "emotion": {
+                "type": "string",
+                "enum": [
+                  "angry",
+                  "sad"
+                ]
+              },
+              "stage": {
+                "type": "string",
+                "enum": [
+                  "hurt",
+                  "guarded",
+                  "softening"
+                ]
+              }
+            },
+            "required": [
+              "strain",
+              "emotion",
+              "stage"
+            ]
+          },
           "repair": {
             "$ref": "#/components/schemas/DialogueRepair"
           },
@@ -1398,6 +1431,39 @@
           "text": {
             "type": "string"
           },
+          "affect": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "strain": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 6
+              },
+              "emotion": {
+                "type": "string",
+                "enum": [
+                  "angry",
+                  "sad"
+                ]
+              },
+              "stage": {
+                "type": "string",
+                "enum": [
+                  "hurt",
+                  "guarded",
+                  "softening"
+                ]
+              }
+            },
+            "required": [
+              "strain",
+              "emotion",
+              "stage"
+            ]
+          },
           "repairAction": {
             "type": "string",
             "enum": [
@@ -1418,6 +1484,39 @@
           "prompt": {
             "type": "object",
             "properties": {
+              "affect": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "strain": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 6
+                  },
+                  "emotion": {
+                    "type": "string",
+                    "enum": [
+                      "angry",
+                      "sad"
+                    ]
+                  },
+                  "stage": {
+                    "type": "string",
+                    "enum": [
+                      "hurt",
+                      "guarded",
+                      "softening"
+                    ]
+                  }
+                },
+                "required": [
+                  "strain",
+                  "emotion",
+                  "stage"
+                ]
+              },
               "repair": {
                 "$ref": "#/components/schemas/DialogueRepair"
               },
@@ -9372,6 +9471,719 @@
         }
       }
     },
+    "/api/v1/sessions/{id}/exports": {
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "내 완료 대화의 영상·PDF 준비 상태",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "en",
+                "ja",
+                "zh",
+                "vi",
+                "es",
+                "id",
+                "ko"
+              ],
+              "default": "en"
+            },
+            "required": false,
+            "name": "language",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "format": {
+                            "type": "string",
+                            "enum": [
+                              "video",
+                              "pdf"
+                            ]
+                          },
+                          "language": {
+                            "type": "string",
+                            "enum": [
+                              "en",
+                              "ja",
+                              "zh",
+                              "vi",
+                              "es",
+                              "id",
+                              "ko"
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "queued",
+                              "running",
+                              "ready",
+                              "failed"
+                            ]
+                          },
+                          "stage": {
+                            "type": "string"
+                          },
+                          "error": {
+                            "type": [
+                              "object",
+                              "null"
+                            ],
+                            "properties": {
+                              "code": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "retryable": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "code",
+                              "message",
+                              "retryable"
+                            ]
+                          },
+                          "bytes": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "durationSeconds": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "format",
+                          "language",
+                          "status",
+                          "stage",
+                          "error",
+                          "bytes",
+                          "durationSeconds"
+                        ]
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string"
+                        },
+                        "apiVersion": {
+                          "type": "string",
+                          "enum": [
+                            "v1"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "requestId",
+                        "apiVersion"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "전체 대화 MP4 또는 상세 보고서 PDF 만들기 — 같은 요청 재사용",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "format": {
+                    "type": "string",
+                    "enum": [
+                      "video",
+                      "pdf"
+                    ]
+                  },
+                  "language": {
+                    "type": "string",
+                    "enum": [
+                      "en",
+                      "ja",
+                      "zh",
+                      "vi",
+                      "es",
+                      "id",
+                      "ko"
+                    ],
+                    "default": "en"
+                  },
+                  "retry": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                },
+                "required": [
+                  "format"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "format": {
+                          "type": "string",
+                          "enum": [
+                            "video",
+                            "pdf"
+                          ]
+                        },
+                        "language": {
+                          "type": "string",
+                          "enum": [
+                            "en",
+                            "ja",
+                            "zh",
+                            "vi",
+                            "es",
+                            "id",
+                            "ko"
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "queued",
+                            "running",
+                            "ready",
+                            "failed"
+                          ]
+                        },
+                        "stage": {
+                          "type": "string"
+                        },
+                        "error": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "properties": {
+                            "code": {
+                              "type": "string"
+                            },
+                            "message": {
+                              "type": "string"
+                            },
+                            "retryable": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "code",
+                            "message",
+                            "retryable"
+                          ]
+                        },
+                        "bytes": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "durationSeconds": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "format",
+                        "language",
+                        "status",
+                        "stage",
+                        "error",
+                        "bytes",
+                        "durationSeconds"
+                      ]
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string"
+                        },
+                        "apiVersion": {
+                          "type": "string",
+                          "enum": [
+                            "v1"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "requestId",
+                        "apiVersion"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/exports/{id}/download": {
+      "post": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "내보낸 파일의 10분 유효 다운로드 링크",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string"
+                        },
+                        "filename": {
+                          "type": "string"
+                        },
+                        "mimeType": {
+                          "type": "string"
+                        },
+                        "expiresIn": {
+                          "type": "number",
+                          "enum": [
+                            600
+                          ]
+                        }
+                      },
+                      "required": [
+                        "url",
+                        "filename",
+                        "mimeType",
+                        "expiresIn"
+                      ]
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string"
+                        },
+                        "apiVersion": {
+                          "type": "string",
+                          "enum": [
+                            "v1"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "requestId",
+                        "apiVersion"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/speech/transcriptions": {
       "post": {
         "tags": [
@@ -9866,6 +10678,15 @@
                         "evaluation": {
                           "type": "object",
                           "properties": {
+                            "offenseSeverity": {
+                              "type": "string",
+                              "enum": [
+                                "mild",
+                                "serious",
+                                "severe"
+                              ],
+                              "default": "serious"
+                            },
                             "repairAction": {
                               "type": "string",
                               "enum": [

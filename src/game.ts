@@ -1,4 +1,5 @@
 import * as Endings from './endings';
+import {recoverAffect,affectEmotion} from './affect';
 import {initialSpeechLevel} from './dialogue';
 import { translations } from './translations';
 import { conciseBrief } from './briefings';
@@ -40,7 +41,7 @@ export function publicPlay(play: Play): SessionValue {
   const { action, cues } = learningSupport(s, node);
   const brief=briefingFor(s,play.sceneId);const translated=Object.values(brief).every(text=>!!play.subtitles?.[text]);
   return { id: play.id, sceneId: play.sceneId, characterId: s.characterId, personalityId: s.personalityId, pack: s.pack, aiMode: play.aiMode,
-    repair:play.repair||null,
+    affect:play.affect||null,repair:play.repair||null,
     status: play.status, lives: play.lives, initialLives: 3, nodeIndex: play.nodeIndex, nodeCount: s.nodes.length,
     briefing:{...brief,translation:translated?{language:play.subtitleLanguage||'en',title:play.subtitles![brief.title],partner:play.subtitles![brief.partner],situation:play.subtitles![brief.situation],goal:play.subtitles![brief.goal]}:null},
     npc: {speechLevel:play.speechLevel||initialSpeechLevel(s.nodes[0].npcText),gesture:play.gesture||'idle',render:null, subtitle:play.subtitles?.[node.npcText]?{language:play.subtitleLanguage||'en',text:play.subtitles[node.npcText]}:null,audioUrl:null,text: node.npcText, emotion: play.emotion, assetKey: play.imageAssetKey||`characters/${s.characterId}/${play.emotion}`, action, cues },
@@ -136,7 +137,7 @@ export async function correctLastTurn(id:string,sessionId:string,turnId:string){
     if(index<0)throw new ApiError('CORRECTION_UNAVAILABLE','이전 버전 대화는 장면 전체를 다시 시작해 주세요.',409);
     play.nodeIndex=index;
     const prompt=turn.prompt;
-    play.repair=prompt?.repair||null;
+    play.repair=prompt?.repair||null;play.affect=prompt?.affect||null;
     play.dialogue=prompt?{nodeIndex:index,npcText:prompt.text,action:prompt.action,cues:prompt.cues}:undefined;
     const previous=play.history.at(-2);
     play.speechLevel=prompt?.speechLevel||previous?.npcSpeechLevel||initialSpeechLevel(play.scenario.nodes[0].npcText);
@@ -205,10 +206,15 @@ export async function submitTurn(id: string, sessionId: string, input: TurnInput
   try {
     const imageOptions=(await CharacterImages.variants('')).filter(i=>i.characterId===play!.scenario.characterId&&i.imageUrl).map(({assetKey,emotion,gesture,label,reaction,pose,useWhen,tags,endingPreferred})=>({assetKey,emotion,gesture,label:label||'',reaction:reaction||'',pose:pose||'',useWhen:useWhen||'',tags:tags||[],endingPreferred:endingPreferred||false}));
     const closingAllowed=play!.nodeIndex>=Math.max(1,play!.scenario.nodes.length-2);
-    const grade = await evaluate(play!.scenario, activeNode(play!), text!, play!.aiMode, metrics, play!.history.map(t => ({ user: t.text, npc: t.npcReply })), play!.nodeIndex===play!.scenario.branchAt ? (play!.scenario.routes||[]).map(r=>r.id) : [], closingAllowed ? (play!.scenario.endings||[]).map(e=>e.id) : [],play!.subtitleLanguage||'en',imageOptions,play!.lives,nextCheckpoint(play!),closingAllowed,play!.speechLevel||initialSpeechLevel(play!.scenario.nodes[0].npcText),play!.repair||null);
+    const grade = await evaluate(play!.scenario, activeNode(play!), text!, play!.aiMode, metrics, play!.history.map(t => ({ user: t.text, npc: t.npcReply })), play!.nodeIndex===play!.scenario.branchAt ? (play!.scenario.routes||[]).map(r=>r.id) : [], closingAllowed ? (play!.scenario.endings||[]).map(e=>e.id) : [],play!.subtitleLanguage||'en',imageOptions,play!.lives,nextCheckpoint(play!),closingAllowed,play!.speechLevel||initialSpeechLevel(play!.scenario.nodes[0].npcText),play!.repair||null,play!.affect||null);
     const assessment=assess(grade),failed=play!.lives<=1&&assessment.outcome==='misunderstanding';
     // A repaired relationship is a good response, but does not complete the paused story goal.
     if(grade.repairAction!=='none'){assessment.progression='retry';assessment.goalAchieved=false;}
+    const affect=recoverAffect(play!.affect||null,grade,assessment.mark,play!.scenario.personalityId,!!play!.repair);
+    if(affect&&!failed){
+      const emotion=affectEmotion(affect);
+      if(grade.emotion!==emotion){grade.imageAssetKey=null;grade.emotion=emotion;grade.gesture='idle';grade.action=affect.stage==='hurt'?'굳은 표정으로 상대를 바라본다.':'표정의 긴장이 조금 누그러지지만 차분한 태도를 유지한다.';grade.cues=[{k:'표정',v:grade.action},{k:'억양',v:'들뜨지 않고 신중한 목소리로 말한다.'}];}
+    }
     const lastSuccess=assessment.progression==='advance'&&(grade.conversationComplete||play!.nodeIndex===play!.scenario.nodes.length-1);
     const badEnding=failed||(lastSuccess&&play!.scenario.endings?.some(e=>e.id===grade.endingId&&e.kind==='bad'))||false;
     grade.emotion=CharacterImages.endingEmotion(grade.emotion,badEnding,failed);
@@ -227,16 +233,16 @@ export async function submitTurn(id: string, sessionId: string, input: TurnInput
       const node = activeNode(current);
       const previous = current.history.filter(t => t.nodeId === node.id);
       const turn: TurnValue = { id: turnId, clientTurnId: input.clientTurnId, inputType: input.inputType, text: text!, outcome, confidence: grade.confidence,
-        repairAction:grade.repairAction,
+        affect,repairAction:grade.repairAction,
         npcSpeechLevel:grade.npcSpeechLevel||current.speechLevel||initialSpeechLevel(current.scenario.nodes[0].npcText),
-        prompt:{repair:current.repair||null,speechLevel:current.speechLevel||initialSpeechLevel(current.scenario.nodes[0].npcText),text:node.npcText,action:node.action||'',cues:node.cues||[]},
+        prompt:{affect:current.affect||null,repair:current.repair||null,speechLevel:current.speechLevel||initialSpeechLevel(current.scenario.nodes[0].npcText),text:node.npcText,action:node.action||'',cues:node.cues||[]},
         nodeId:node.id,mark:assessment.mark,evaluation:{...assessment,reasonSubtitle:assessment.reasonSubtitle?{language:current.subtitleLanguage||'en',text:assessment.reasonSubtitle}:null}, native: grade.native, attempt: previous.length + 1,
         comparison: previous.length ? { firstAnswer: previous[0].text, currentAnswer: text!, improved: outcome === 'correct' } : null,
         feedback: { tone: { score: grade.toneScore, label: grade.toneLabel, source: 'text_politeness' }, speed: metrics ? { value: metrics.speed, unit: metrics.speedUnit, estimated: true } : null,
           hesitation: metrics ? { pauseCount: metrics.pauseCount, fillerCount: metrics.fillerCount, estimated: true, note: '낮은 음량 구간과 추임새를 센 추정치예요. 심리 상태를 뜻하지 않아요.' } : null,
           message: grade.feedback, betterExpression: grade.betterExpression, reason: assessment.reason, views: grade.views }, gesture:grade.gesture,render:selectedImage,npcReplySubtitle:grade.npcReplySubtitle?{language:current.subtitleLanguage||'en',text:grade.npcReplySubtitle}:null,audioUrl:null,npcReply: grade.npcReply, action: grade.action, cues: grade.cues, emotion: grade.emotion,
         lifeDelta, provider: grade.provider, isMock: grade.isMock, createdAt: now() };
-      current.speechLevel=turn.npcSpeechLevel;current.imageAssetKey=selectedImage.assetKey; current.history.push(turn); current.lives += lifeDelta; current.emotion = grade.emotion; current.gesture=grade.gesture; current.updatedAt = now();
+      current.affect=affect;current.speechLevel=turn.npcSpeechLevel;current.imageAssetKey=selectedImage.assetKey; current.history.push(turn); current.lives += lifeDelta; current.emotion = grade.emotion; current.gesture=grade.gesture; current.updatedAt = now();
       if(grade.repairAction==='resolved')current.repair=null;
       else if(grade.repairAction==='request_apology'||grade.repairAction==='request_clarification'){
         current.repair={kind:grade.repairAction==='request_apology'?'apology':'clarification',issue:(grade.repairIssue||assessment.reason).slice(0,400),triggerText:text!,resumeNpcText:current.repair?.resumeNpcText||node.npcText};
