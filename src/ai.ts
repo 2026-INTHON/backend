@@ -3,6 +3,7 @@ import { z, Cue, Perspective, Gesture } from './contracts';
 import { characters, learningSupport, type Scenario, type SceneNode } from './catalog';
 import type { MetricsValue } from './contracts';
 import { ApiError } from './errors';
+import { personaPrompt } from './personas';
 
 export const Grade = z.object({ outcome: z.enum(['correct', 'misunderstanding', 'clarify']), confidence: z.number().min(0).max(1), toneScore: z.number().min(0).max(100),
   imageAssetKey:z.string().nullable().default(null),evaluationMark:z.enum(['O','△','X','?']).nullable().default(null),reaction:z.enum(['happy','neutral','angry','sad','confused']).nullable().default(null),goalAchieved:z.boolean().nullable().default(null),reasonSubtitle:z.string().default(''),gesture:Gesture.default('idle'),npcReplySubtitle:z.string().default(''),routeId:z.string().nullable().optional(),endingId:z.string().nullable().optional(),
@@ -41,6 +42,7 @@ export async function evaluate(scenario: Scenario, node: SceneNode, text: string
       emotion: bad ? 'confused' : unclear ? 'neutral' : 'happy', provider: 'mock', isMock: true });
   }
   const result = Grade.safeParse(await aiRequest('/v1/turns/evaluate', { mode, pack: scenario.pack, characterId: scenario.characterId, personalityId: scenario.personalityId,
+    persona:personaPrompt(scenario.characterId,scenario.personalityId),
     situation: scenario.situation, node: { ...node, ...support }, text, history: history.slice(-4), audioMetrics: metrics,allowedRoutes,allowedEndings,subtitleLanguage,imageOptions,livesRemaining }));
   if (!result.success) throw new ApiError('AI_RESPONSE_INVALID', 'AI 응답을 확인하지 못했어요. 체력 차감 없이 다시 시도해 주세요.', 502, true);
   const grade = result.data;

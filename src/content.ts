@@ -4,6 +4,7 @@ import * as C from './contracts';
 import { rows, put } from './content-db';
 import type { Profile } from './models';
 import { ApiError } from './errors';
+import { characterPersona, personaPrompt } from './personas';
 
 export type CatalogCharacter = C.z.infer<typeof C.Character>;
 export type CatalogChapter = C.z.infer<typeof C.Chapter> & {pack:'ko'|'en';source:'curriculum'|'examples'|'personal';generationStatus:'ready'|'generating'|'failed'};
@@ -55,10 +56,8 @@ export async function seedCatalog() {
 let boot:Promise<void>|undefined;
 async function ensure(){ if((await rows('malo_catalog',{kind:'character'})).length)return; boot??=seedCatalog().finally(()=>{boot=undefined;});await boot; }
 export async function characters(){await ensure();return (await rows<Content<CatalogCharacter>>('malo_catalog',{kind:'character'})).map(({document:c})=>({...c,personalities:c.personalities.map(p=>{
-  if(c.id==='professor'&&p.id==='playful')return {...p,name:'친절',short:'따뜻하게 격려하며 이야기를 들어요',description:'편안하게 질문하도록 도와주며, 가벼운 유머를 곁들여 설명해요.'};
-  if(c.id==='professor'&&p.id==='calm')return {...p,name:'기본'};
-  if(c.id==='girlfriend'&&p.id==='playful')return {...p,name:'발랄'};
-  return p;
+  const selected=characterPersona(c.id,p.id);
+  return selected?{...p,name:selected.name,short:selected.short,description:selected.description,profile:selected.profile,profileRevision:selected.revision}:p;
 })}));}
 export async function scene(id:string,owner?:string):Promise<Scenario|null>{
   await ensure();const publicRow=(await rows<Content<Scenario>>('malo_catalog',{id,kind:'scene'}))[0];if(publicRow)return publicRow.document;
@@ -79,4 +78,4 @@ export async function chapters(p:Profile,pack:'ko'|'en',characterId?:string){
     return {...s,state:s.availability!=='ready'?'locked':done.length?'done':plays.some(play=>['active','paused'].includes(play.status))?'now':'open',score:done.length?Math.max(...done.map(play=>play.result?.score||0)):null};
   })};});
 }
-export async function persona(characterId:string,personalityId:string){const c=(await characters()).find(c=>c.id===characterId);const p=c?.personalities.find(p=>p.id===personalityId);if(!c||!p)throw new ApiError('PERSONA_NOT_FOUND','캐릭터와 성격을 확인해 주세요.',422);return {...c,personalities:undefined,personality:p};}
+export async function persona(characterId:string,personalityId:string){const c=(await characters()).find(c=>c.id===characterId);const p=c?.personalities.find(p=>p.id===personalityId);if(!c||!p)throw new ApiError('PERSONA_NOT_FOUND','캐릭터와 성격을 확인해 주세요.',422);return {...personaPrompt(characterId,personalityId),id:c.id,name:c.name,role:c.role,personality:p};}
