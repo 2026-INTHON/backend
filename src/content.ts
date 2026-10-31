@@ -25,8 +25,9 @@ export async function seedCatalog() {
   const save=async(id:string,kind:string,document:unknown)=>put('malo_catalog',{id,kind,document,updated_at:new Date().toISOString()},true);
   for(const c of FE.characters) {
     const id=charMap[c.id], old=legacyCharacters.find(v=>v.id===id)!;
+    const existing=(await rows<Content<Record<string,unknown>>>('malo_catalog',{id,kind:'character'}))[0]?.document||{};
     const personas=FE.personas[c.id as keyof typeof FE.personas].map(p=>({id:personaMap[p.id],clientKey:p.id,name:p.name,description:p.long,short:p.short,level:p.level,assetKey:`personalities/${personaMap[p.id]}`}));
-    await save(id,'character',{...old,name:c.name,role:c.role,call:c.call,free:c.free,clientKey:c.id,imageUrl:`/api/v1/catalog-assets/char-${c.id}.png`,cardUrl:`/api/v1/catalog-assets/card-${c.id}.png`,personalities:personas});
+    await save(id,'character',{...old,name:c.name,role:c.role,call:c.call,free:c.free,clientKey:c.id,imageUrl:`/api/v1/catalog-assets/char-${c.id}.png`,cardUrl:`/api/v1/catalog-assets/card-${c.id}.png`,personalities:personas,...existing});
   }
   for(const place of ['cafe','office','street','commonroom','study'])await save('bg-'+place,'background',{place,imageUrl:`/api/v1/catalog-assets/bg-${place}.png`,source:['commonroom','study'].includes(place)?'chatgpt_pre_generated':'fe-pr7'});
   for(const pack of ['ko','en'] as const)for(const s of legacyScenes(pack))await save(s.id,'scene',{...legacyScenario(s.id),source:'examples',estimatedMinutes:3});
