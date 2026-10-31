@@ -33,6 +33,7 @@ test('A late farewell closes once; early closure, inappropriate and native answe
    const body={clientTurnId:'farewell',inputType:'text',text:'네! 조심히 들어가세요!'};
    const result=(await api(path,body,token)).data;
    assert.equal(requests.at(-1).closingAllowed,true);assert.equal(result.session.status,'succeeded');assert.equal(result.session.nodeIndex,8);assert.ok(result.result);
+   assert.equal(result.result.achievement.reach,100);assert.equal(result.result.score,inappropriate?92:100);
    const again=(await api(path,body,token)).data;
    assert.equal(again.turn.id,result.turn.id);assert.deepEqual(again.result,result.result);
   }
