@@ -1,10 +1,11 @@
+import type {DetailedReportValue} from './report-contracts';
 import type { Scenario } from './catalog';
 import type { MetricsValue, MistakeValue, ResultValue, SettingsValue, TurnValue } from './contracts';
 
 export type StoredTurn = { id: string; clientTurnId: string; inputHash: string; status: 'pending' | 'completed' | 'retryable_error'; response?: TurnResponse; errorCode?: string };
 export type Play = {
   id: string; sceneId: string; scenario: Scenario; aiMode: 'mock' | 'live'; status: 'active' | 'paused' | 'succeeded' | 'failed' | 'abandoned';
-  gesture?:'idle'|'nod'|'tilt'|'thinking'|'open_hand'|'arms_crossed'; subtitleLanguage?:'en'|'ja'|'zh'|'vi'|'es'|'id'|'ko'; subtitles?:Record<string,string>; branchId?:string; endingId?:string; lives: number; nodeIndex: number; hintsUsed: number; hintKeys?: string[]; emotion: 'neutral' | 'happy' | 'confused' | 'sad' | 'angry';
+  detailedReport?:DetailedReportValue; gesture?:'idle'|'nod'|'tilt'|'thinking'|'open_hand'|'arms_crossed'; subtitleLanguage?:'en'|'ja'|'zh'|'vi'|'es'|'id'|'ko'; subtitles?:Record<string,string>; branchId?:string; endingId?:string; lives: number; nodeIndex: number; hintsUsed: number; hintKeys?: string[]; emotion: 'neutral' | 'happy' | 'confused' | 'sad' | 'angry';
   turns: StoredTurn[]; history: TurnValue[]; result: ResultValue | null; createdAt: string; updatedAt: string;
 };
 export type SavedMistake = MistakeValue & { nodeIndex: number; scenario: Scenario; practiceRequests: Record<string, unknown> };
