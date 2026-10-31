@@ -1,3 +1,4 @@
+import * as Endings from './endings';
 import * as Reports from './reports';
 import {ReportResource} from './report-contracts';
 import * as CharacterImages from './character-images';
@@ -121,7 +122,7 @@ endpoint({ method: 'get', path: '/sessions/{id}/history', tag: 'Play', summary: 
 endpoint({ method: 'post', path: '/sessions/{id}/turns', tag: 'Play', summary: '텍스트·선택지·확인한 STT 답변 제출', params: idParam,
   description: 'clientTurnId를 재시도 시 그대로 사용. 동일 ID/내용은 같은 응답. 다른 내용은 409. 명확한 실수만 체력 -1; 애매한 답/AI 오류는 차감 없음. 텍스트·선택지는 속도/망설임 null.',
   input: z.object({ clientTurnId, inputType: z.enum(['text', 'choice', 'voice']), text: text.optional(), choiceId: z.string().optional(), transcriptId: z.string().uuid().optional(), realtime:z.boolean().default(false) }), output: C.TurnResult,
-  run: async(c,body,p)=>{limit(`${p!.id}:turns`,20);let result=await Game.submitTurn(p!.id,c.req.param('id')!,body);if(result.result&&result.session.aiMode==='live'){const report=await Reports.ensure(p!.id,c.req.param('id')!).catch(()=>null);if(report)result={...result,result:{...result.result,report:{reportId:report.reportId,status:report.status}}};}if(Game.getPlay(p!,c.req.param('id')!).subtitleLanguage&&result.session.aiMode==='live')return {...result,turn:{...result.turn,audioUrl:await voiceUrl(c,p!,result.turn.npcReply,result.session)}};return result;} });
+  run: async(c,body,p)=>{limit(`${p!.id}:turns`,20);let result=await Game.submitTurn(p!.id,c.req.param('id')!,body);if(result.result&&result.session.aiMode==='live'){const report=await Reports.ensure(p!.id,c.req.param('id')!).catch(()=>null);if(report)result={...result,result:{...result.result,report:{reportId:report.reportId,status:report.status}}};}if(Game.getPlay(p!,c.req.param('id')!).subtitleLanguage&&result.session.aiMode==='live'){const audioUrl=await voiceUrl(c,p!,result.turn.npcReply,result.session);if(result.result?.ending?.dialogue)result.result.ending.dialogue.audioUrl=audioUrl;return {...result,turn:{...result.turn,audioUrl}};}return result;} });
 endpoint({ method: 'post', path: '/sessions/{id}/hint', tag: 'Play', summary: '2단계 힌트 — 관찰 단서 → 가상 캐릭터의 속마음·표현 팁', params: idParam,
   description: 'step=1은 주목 표현·행동·상황 단서만 반환하며 hiddenThought/tip은 null. step=2는 속마음과 표현 팁을 추가 공개. 같은 노드·단계의 재조회는 hintsUsed를 중복 증가시키지 않음. 기존 클라이언트의 {} 요청은 step=2로 처리.',
   input: z.object({ step: z.union([z.literal(1), z.literal(2)]).default(2) }),
@@ -131,7 +132,8 @@ for (const action of ['pause', 'resume', 'abandon'] as const) endpoint({ method:
 endpoint({ method: 'post', path: '/sessions/{id}/retry', tag: 'Play', summary: '같은 장면을 새 세션으로 다시 하기', params: idParam, input: empty, output: C.Session,
   run: (c, _, p) => { const old = Game.getPlay(p!, c.req.param('id')!); return Game.createPlay(p!.id, old.sceneId, old.aiMode, old.scenario,undefined,old.subtitleLanguage); } });
 endpoint({ method: 'get', path: '/sessions/{id}/result', tag: 'Play', summary: '결과·잘한 말·아쉬운 말·지급된 재화', params: idParam, output: C.Result,
-  run: async(c, _, p) => { const play=Game.getPlay(p!,c.req.param('id')!);let result=play.result; if (!result) throw new ApiError('RESULT_NOT_READY', '장면을 마친 후 확인할 수 있어요.', 409); if(play.aiMode==='live'){const report=await Reports.read(p!.id,play.id).catch(()=>null);if(report)result={...result,report:{reportId:report.reportId,status:report.status}};}return result; } });
+  run: async(c, _, p) => { const play=Game.getPlay(p!,c.req.param('id')!);let result=play.result?{...play.result,ending:Endings.presentation(play)}:null; if (!result) throw new ApiError('RESULT_NOT_READY', '장면을 마친 후 확인할 수 있어요.', 409); if(play.aiMode==='live'){const report=await Reports.read(p!.id,play.id).catch(()=>null);if(report)result={...result,report:{reportId:report.reportId,status:report.status}};}return result; } });
+endpoint({method:'get',path:'/sessions/{id}/ending',tag:'Play',summary:'완료한 대화의 엔딩 대사·이미지·정리 코멘트·선택 언어 번역',params:idParam,output:C.Ending,run:(c,_,p)=>{const play=Game.getPlay(p!,c.req.param('id')!);if(!play.result)throw new ApiError('ENDING_NOT_READY','대화를 마친 후 엔딩을 확인할 수 있어요.',409);return Endings.presentation(play);}});
 endpoint({ method: 'post', path: '/sessions/{id}/speech', tag: 'Speech', summary: '현재 NPC 또는 지정한 반응 대사 TTS — 서명 URL 반환', params: idParam, input: z.object({turnId:z.string().uuid().optional()}), output: C.AudioAsset,
   run: async (c, body, p) => { limit(`${p!.id}:tts`, 20); const play = Game.getPlay(p!, c.req.param('id')!), s = Game.publicPlay(play);
     const turn=body.turnId?play.history.find(t=>t.id===body.turnId):null;if(body.turnId&&!turn)throw new ApiError('TURN_NOT_FOUND','대사를 찾지 못했어요.',404);
