@@ -28,19 +28,20 @@ const { z } = C;
 type Env = { Variables: { requestId: string } };
 export const app = new OpenAPIHono<Env>({ defaultHook(result) { if (!result.success) throw new ApiError('VALIDATION_ERROR', '요청 형식을 확인해 주세요.', 422, false, result.error.issues.map(i => ({ path: i.path, message: i.message }))); } }).basePath('/api/v1');
 app.use('*', async (c, next) => { c.set('requestId', randomUUID()); c.header('X-Request-Id', c.get('requestId')); c.header('Cache-Control', 'no-store'); await next(); });
-app.use('*', cors({ origin: process.env.MALO_CORS_ORIGINS?.split(',') || '*', allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'], allowHeaders: ['Content-Type', 'Authorization'], exposeHeaders: ['X-Request-Id'] }));
+app.use('*', cors({ origin: process.env.MALO_CORS_ORIGINS?.split(',') || '*', allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'], allowHeaders: ['Content-Type', 'Authorization'], exposeHeaders: ['X-Request-Id', 'Retry-After'] }));
 app.use('*', bodyLimit({ maxSize: 6 * 1024 * 1024, onError: () => { throw new ApiError('REQUEST_TOO_LARGE', '요청 크기가 너무 커요.', 413); } }));
 // ponytail: In-memory, per-instance request limits for one VM. Persistent AI usage ceilings live in the AI service.
 const limits = new Map<string, { count: number; until: number }>();
 function limit(key: string, cap: number) {
   if (limits.size > 10000) for (const [k, v] of limits) if (v.until < Date.now()) limits.delete(k);
   const state = limits.get(key); if (!state || state.until < Date.now()) { limits.set(key, { count: 1, until: Date.now() + 60000 }); return; }
-  if (++state.count > cap) throw new ApiError('RATE_LIMITED', '잠시 후 다시 시도해 주세요.', 429, true);
+  if (++state.count > cap) {const retryAfter=Math.max(1,Math.ceil((state.until-Date.now())/1000));throw new ApiError('RATE_LIMITED', `${retryAfter}초 뒤 다시 시도해 주세요.`, 429, true,{retryAfter});}
 }
 app.onError((error, c) => {
   const e = error instanceof ApiError ? error : error instanceof C.z.ZodError ? new ApiError('VALIDATION_ERROR', '요청 형식을 확인해 주세요.', 422) : error instanceof HTTPException && error.status < 500 ? new ApiError('INVALID_REQUEST', '요청 형식을 확인해 주세요.', error.status) : new ApiError('INTERNAL_ERROR', '요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.', 500, true);
   // Never log tokens, user dialogue, raw provider errors or request bodies.
   if (!(error instanceof ApiError)) console.error('request_failed', c.get('requestId'), error.name);
+  if(e.code==='RATE_LIMITED')c.header('Retry-After',String((e.details as {retryAfter:number}).retryAfter));
   return c.json({ error: { code: e.code, message: e.message, retryable: e.retryable, requestId: c.get('requestId'), ...(e.details ? { details: e.details } : {}) } }, e.status as 400);
 });
 app.notFound(c => c.json({ error: { code: 'NOT_FOUND', message: 'API 경로를 확인해 주세요.', retryable: false, requestId: c.get('requestId') } }, 404));
@@ -61,7 +62,8 @@ function endpoint<I extends C.z.ZodType = C.z.ZodObject, O extends C.z.ZodType =
   app.openapi(route, async c => {
     const p = protectedRoute ? await Auth.authenticate(c.req.header('Authorization')) : null;
     const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || 'local';
-    limit(`${p?.id || ip}:requests`, protectedRoute ? 180 : 60);
+    // Navigation/polling must not consume the budget for starting or answering a scene.
+    if(e.path!=='/health')limit(`${p?.id || ip}:${e.method==='get'?'reads':'writes'}`, protectedRoute ? 180 : 60);
     if (e.path === '/auth/guest') limit(`${ip}:guest`, 10);
     const body = (e.input ? e.input.parse(await c.req.json()) : {}) as C.z.infer<I>;
     let value=await e.run(c,body,p);

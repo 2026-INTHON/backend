@@ -63,7 +63,16 @@ export function records(p: Profile) {
 export async function createPlay(id: string, sceneId: string, aiMode: 'mock' | 'live', customScenario?: Scenario, personalityId?:string,subtitleLanguage?:'en'|'ja'|'zh'|'vi'|'es'|'id'|'ko') {
   let scenario = customScenario || await Content.scene(sceneId,id);
   if (!scenario) throw new ApiError('SCENE_NOT_FOUND', '장면을 찾지 못했어요.', 404);
-  if(personalityId&&scenario.source!=='personal'){await Content.persona(scenario.characterId,personalityId);scenario={...scenario,personalityId};}
+  if(personalityId&&scenario.source!=='personal'){
+    await Content.persona(scenario.characterId,personalityId);
+    // The legacy chapter represents one story; use the selected personality's script.
+    if(findScenario(sceneId)){
+      const variantId=`${scenario.pack}-${scenario.characterId}-${personalityId}`;
+      const variant=await Content.scene(variantId,id);
+      if(variant){scenario=variant;sceneId=variantId;}
+    }
+    scenario={...scenario,personalityId};
+  }
   const actor=(await Content.characters()).find(c=>c.id===scenario!.characterId);scenario={...scenario,partnerName:actor?.name||scenario.partnerName};
   if(scenario.source==='personal'||scenario.source==='curriculum')aiMode='live';
   let subtitles:Record<string,string>={};
