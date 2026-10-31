@@ -88,6 +88,9 @@ endpoint({ method: 'get', path: '/me', tag: 'Home', summary: '내 계정', outpu
 endpoint({ method: 'get', path: '/home', tag: 'Home', summary: '이어하기·오늘의 장면·재화·출석 팝업', output: C.Home, run: (_, __, p) => Game.home(p!) });
 endpoint({ method: 'get', path: '/packs', tag: 'Catalog', summary: '한국어/영어팩', auth: false, output: z.array(feature), run: () => packs });
 endpoint({ method: 'get', path: '/characters', tag: 'Catalog', summary: '4명 캐릭터와 각 3가지 성격', auth: false, output: z.array(C.Character), run: () => characters });
+endpoint({ method: 'get', path: '/chapters', tag: 'Catalog', summary: '캐릭터별 챕터·성격별 서브 챕터와 내 진행 상태',
+  query: z.object({ pack: C.Pack.optional(), characterId: z.string().optional() }), output: z.array(C.Chapter),
+  run: (c, _, p) => Game.chapters(p!, (c.req.query('pack') || p!.state.settings.pack) as 'ko' | 'en', c.req.query('characterId')) });
 endpoint({ method: 'get', path: '/scenes', tag: 'Catalog', summary: '팩·캐릭터·성격별 장면 목록', auth: false,
   query: z.object({ pack: C.Pack.optional(), characterId: z.string().optional(), personalityId: z.string().optional() }), output: z.array(C.Scene),
   run: c => listScenes((c.req.query('pack') || 'ko') as 'ko' | 'en', c.req.query('characterId'), c.req.query('personalityId')) });
@@ -104,10 +107,11 @@ endpoint({ method: 'post', path: '/sessions/{id}/turns', tag: 'Play', summary: '
   description: 'clientTurnId를 재시도 시 그대로 사용. 동일 ID/내용은 같은 응답. 다른 내용은 409. 명확한 실수만 체력 -1; 애매한 답/AI 오류는 차감 없음. 텍스트·선택지는 속도/망설임 null.',
   input: z.object({ clientTurnId, inputType: z.enum(['text', 'choice', 'voice']), text: text.optional(), choiceId: z.string().optional(), transcriptId: z.string().uuid().optional() }), output: C.TurnResult,
   run: (c, body, p) => { limit(`${p!.id}:turns`, 20); return Game.submitTurn(p!.id, c.req.param('id')!, body); } });
-endpoint({ method: 'post', path: '/sessions/{id}/hint', tag: 'Play', summary: '가상 캐릭터의 속마음·학습 힌트', params: idParam, input: empty,
-  output: z.object({ hiddenThought: z.string(), tip: z.string(), isFictional: z.literal(true), session: C.Session }),
-  run: async (c, _, p) => (await mutate(p!.id, user => { const play = Game.getPlay(user, c.req.param('id')!); if (play.status !== 'active') throw new ApiError('SESSION_NOT_ACTIVE', '진행 중인 장면에서 사용할 수 있어요.', 409);
-    play.hintsUsed++; const node = play.scenario.nodes[play.nodeIndex]; return { hiddenThought: node.hiddenThought, tip: node.tip, isFictional: true as const, session: Game.publicPlay(play) }; })).value });
+endpoint({ method: 'post', path: '/sessions/{id}/hint', tag: 'Play', summary: '2단계 힌트 — 관찰 단서 → 가상 캐릭터의 속마음·표현 팁', params: idParam,
+  description: 'step=1은 주목 표현·행동·상황 단서만 반환하며 hiddenThought/tip은 null. step=2는 속마음과 표현 팁을 추가 공개. 같은 노드·단계의 재조회는 hintsUsed를 중복 증가시키지 않음. 기존 클라이언트의 {} 요청은 step=2로 처리.',
+  input: z.object({ step: z.union([z.literal(1), z.literal(2)]).default(2) }),
+  output: z.object({ nodeId: z.string(), step: z.union([z.literal(1), z.literal(2)]), clue: z.array(C.Clue), hiddenThought: z.string().nullable(), tip: z.string().nullable(), isFictional: z.literal(true), session: C.Session }),
+  run: (c, body, p) => Game.revealHint(p!.id, c.req.param('id')!, body.step) });
 for (const action of ['pause', 'resume', 'abandon'] as const) endpoint({ method: 'post', path: `/sessions/{id}/${action}`, tag: 'Play', summary: `${action} — 일시정지/재개/나가기`, params: idParam, input: empty, output: C.Session, run: (c, _, p) => Game.transition(p!.id, c.req.param('id')!, action) });
 endpoint({ method: 'post', path: '/sessions/{id}/retry', tag: 'Play', summary: '같은 장면을 새 세션으로 다시 하기', params: idParam, input: empty, output: C.Session,
   run: (c, _, p) => { const old = Game.getPlay(p!, c.req.param('id')!); return Game.createPlay(p!.id, old.sceneId, old.aiMode, old.scenario); } });

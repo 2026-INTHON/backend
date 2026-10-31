@@ -1,6 +1,7 @@
-import type { SceneValue } from './contracts';
+import type { SceneValue, z, Cue, Clue, Perspective } from './contracts';
 
-export type SceneNode = { id: string; npcText: string; goal: string; goodExample: string; hiddenThought: string; tip: string; choices: { id: string; text: string }[]; nextNodeId: string | null };
+export type SceneNode = { id: string; npcText: string; goal: string; goodExample: string; hiddenThought: string; tip: string; choices: { id: string; text: string }[]; nextNodeId: string | null;
+  action?: string; cues?: z.infer<typeof Cue>[]; clue?: z.infer<typeof Clue>[]; views?: z.infer<typeof Perspective>[] };
 export type Scenario = { title: string; situation: string; goal: string; pack: 'ko' | 'en'; characterId: string; personalityId: string; nodes: SceneNode[] };
 export const packs = [{ id: 'ko', name: '한국어팩', description: '상황과 관계에 맞는 말투를 연습해요.' }, { id: 'en', name: '영어팩', description: '짧은 상황극으로 영어 회화 감각을 길러요.' }];
 const personalities = [
@@ -59,6 +60,43 @@ const scripts: Record<string, { title: string; situation: string; goal: string; 
     ] },
 };
 
+const actions: Record<string, string[]> = {
+  manager: ['서류를 넘기며 진행 상황을 묻는다.', '시계를 본 뒤 대답을 기다린다.', '수첩에 일정을 적고 고개를 끄덕인다.'],
+  professor: ['과제 목록을 보다가 학생을 바라본다.', '달력의 제출일을 짚으며 묻는다.', '합의한 일정을 적고 고개를 끄덕인다.'],
+  friend: ['휴대전화의 주말 일정을 보여준다.', '지도 화면을 열고 상대를 바라본다.', '약속을 달력에 적으며 웃는다.'],
+  girlfriend: ['휴대전화를 내려놓고 상대를 바라본다.', '컵을 내려놓고 답을 기다린다.', '통화 시간을 확인하고 미소 짓는다.'],
+};
+const otherExpressions: Record<string, { who: string; cue: string; ko: string[]; en: string[] }> = {
+  manager: { who: '친구에게', cue: '업무 보고 대신 함께 하는 일의 진행 상황을 편하게 전해요.',
+    ko: ['자료는 다 모았고 마지막 정리가 남았어.', '내일 오후 5시까지 끝낼게. 오늘 6시에 진행 상황 먼저 알려줄까?', '오늘 진행 상황 알려주고 내일 5시에 줄게. 바뀌면 바로 연락할게.'],
+    en: ['I have all the data. I just need to finish the analysis.', 'I can finish by five tomorrow. Want an update at six today?', 'I will update you today and let you know if anything changes.'] },
+  professor: { who: '친구에게', cue: '과제 제출 요청을 함께 하는 일의 일정 조율로 바꾸어 봐요.',
+    ko: ['미안해. 내일 오후 5시까지 보내도 될까?', '오늘 8시에 초안 먼저 보내고 내일 5시에 완성본 줄게.', '고마워. 오늘 8시에 초안, 내일 5시에 완성본 보낼게.'],
+    en: ['Sorry, could I send it by five tomorrow?', 'I can send a draft at eight today and the final version at five tomorrow.', 'Thanks. I will send the draft tonight and the final version at five tomorrow.'] },
+  friend: { who: '교수님에게 (면담 일정)', cue: '친구와의 약속을 면담 일정으로 바꾸고 정중하게 요청해요.',
+    ko: ['토요일 오후에는 일정이 있습니다. 점심에 면담이 가능하실까요?', '학교 앞 카페에서 12시에 뵈어도 괜찮을까요?', '감사합니다. 토요일 12시에 학교 앞 카페에서 뵙겠습니다.'],
+    en: ['I have plans on Saturday afternoon. Would a lunchtime meeting be possible, Professor?', 'Would it be convenient to meet at the cafe near campus at noon?', 'Thank you, Professor. I will meet you at the cafe at noon on Saturday.'] },
+  girlfriend: { who: '함께 일하는 동료에게', cue: '가까운 사이의 연락 약속을 업무 연락과 진행 공유로 바꾸어 봐요.',
+    ko: ['회의가 길어져 연락이 늦었어요. 기다리게 해서 죄송해요.', '다음에는 미리 알려드릴게요. 오늘 9시에 잠깐 통화 가능하실까요?', '감사합니다. 오늘 9시에 제가 전화드릴게요. 다음에는 미리 공유하겠습니다.'],
+    en: ['Sorry for the late reply. My meeting ran over, and I should have let you know.', 'I will let you know beforehand next time. Could we have a quick call at nine?', 'Thank you. I will call at nine and keep you updated next time.'] },
+};
+
+// Old saved sessions predate these fields. Derive their support without rewriting the saved scenario.
+export function learningSupport(scenario: Scenario, node: SceneNode) {
+  const index = Math.max(0, scenario.nodes.findIndex(n => n.id === node.id));
+  const action = node.action || actions[scenario.characterId]?.[index] || '상대를 바라보며 대답을 기다린다.';
+  const delivery = scenario.personalityId === 'strict' ? '질문의 끝을 짧고 또렷하게 말한다.' : scenario.personalityId === 'playful' ? '조금 가벼운 억양으로 말을 건넨다.' : '차분하게 말하고 상대의 대답을 기다린다.';
+  const expression = scenario.personalityId === 'strict' ? '눈썹을 살짝 올리고 상대를 바라본다.' : scenario.personalityId === 'playful' ? '가볍게 미소를 짓는다.' : '편안한 표정으로 상대를 바라본다.';
+  const cues = node.cues?.length ? node.cues : [{ k: '표정' as const, v: expression }, { k: '억양' as const, v: delivery }];
+  const clue = node.clue?.length ? node.clue : [{ k: '주목 표현', v: node.npcText }, { k: '행동', v: action }, { k: '상황 단서', v: scenario.situation }];
+  const other = otherExpressions[scenario.characterId];
+  const views = node.views?.length ? node.views : [
+    { who: '현재 상대에게', meaning: node.goodExample, cue: node.tip },
+    { who: other?.who || '관계가 다른 상대에게', meaning: other?.[scenario.pack][index] || node.goodExample, cue: other?.cue || '같은 의도라도 관계와 상황에 맞게 표현을 조정해요.' },
+  ];
+  return { action, cues, clue, views };
+}
+
 export function buildScenario(characterId: string, personalityId: string, pack: 'ko' | 'en'): Scenario {
   const source = scripts[characterId];
   if (!source || !personalities.some(p => p.id === personalityId)) throw new Error('CATALOG_NOT_FOUND');
@@ -70,7 +108,8 @@ export function buildScenario(characterId: string, personalityId: string, pack: 
   }));
   const prefix = pack === 'en' ? { strict: 'Let us be specific. ', playful: 'Hey, no pressure. ', calm: 'Take your time. ' } : { strict: '구체적으로 이야기해 봐요. ', playful: '너무 긴장하지 말고요. ', calm: '천천히 이야기해 봐요. ' };
   nodes[0].npcText = prefix[personalityId as keyof typeof prefix] + nodes[0].npcText;
-  return { title: source.title, situation: source.situation, goal: source.goal, pack, characterId, personalityId, nodes };
+  const scenario = { title: source.title, situation: source.situation, goal: source.goal, pack, characterId, personalityId, nodes };
+  return { ...scenario, nodes: nodes.map(node => ({ ...node, ...learningSupport(scenario, node) })) };
 }
 
 export function sceneId(characterId: string, personalityId: string, pack: string) { return `${pack}-${characterId}-${personalityId}`; }

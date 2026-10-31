@@ -4,6 +4,8 @@ Base URL: `https://inthon-demo-20261031-dh.koreacentral.cloudapp.azure.com/api/v
 
 Swagger는 `/docs`, JSON 명세는 `/openapi.json`입니다. iPhone/갤럭시 Expo Go에서 같은 HTTPS 주소를 사용하므로 같은 Wi-Fi나 로컬 PC 주소가 필요하지 않습니다.
 
+비언어 단서·2단계 힌트·모국어 답변·O△X·재도전 비교·관점 전환·성취도·서브 챕터는 [학습 지원 API 연결 가이드](LEARNING-SUPPORT.md)를 참고하세요.
+
 ## 공통 규칙
 
 - 성공: `{ data, meta: { requestId, apiVersion: "v1" } }`
@@ -24,7 +26,7 @@ Swagger는 `/docs`, JSON 명세는 `/openapi.json`입니다. iPhone/갤럭시 Ex
 | 장면 브리핑 | `GET /scenes?pack=ko&characterId=professor&personalityId=strict` |
 | 장면 시작 | `POST /sessions {"sceneId":"ko-professor-strict","aiMode":"mock"}` |
 | 캐릭터 음성 | `POST /sessions/{id}/speech {}` → `audioUrl` 재생 |
-| 속마음 | `POST /sessions/{id}/hint {}` |
+| 속마음 | `POST /sessions/{id}/hint {step:1}` 단서 → `{step:2}` 속마음 |
 | 답변 | `POST /sessions/{id}/turns` (아래 예시) |
 | 피드백 팝업 | 응답 `turn.feedback`, `oopsMoment`, `session` 사용 |
 | 완료/실패 | 응답 `result` 또는 `GET /sessions/{id}/result` |

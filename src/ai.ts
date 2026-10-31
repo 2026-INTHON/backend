@@ -1,10 +1,13 @@
-import { z } from './contracts';
-import { characters, type Scenario, type SceneNode } from './catalog';
+import { z, Cue, Perspective } from './contracts';
+import { characters, learningSupport, type Scenario, type SceneNode } from './catalog';
 import type { MetricsValue } from './contracts';
 import { ApiError } from './errors';
 
 export const Grade = z.object({ outcome: z.enum(['correct', 'misunderstanding', 'clarify']), confidence: z.number().min(0).max(1), toneScore: z.number().min(0).max(100),
-  toneLabel: z.string(), feedback: z.string(), betterExpression: z.string(), reason: z.string(), npcReply: z.string(), emotion: z.enum(['neutral', 'happy', 'confused', 'sad', 'angry']), provider: z.string(), isMock: z.boolean() });
+  native: z.boolean(),
+  toneLabel: z.string(), feedback: z.string(), betterExpression: z.string(), reason: z.string(), npcReply: z.string(),
+  action: z.string().trim().min(1).max(400), cues: z.array(Cue).min(1).max(5), views: z.array(Perspective).min(2).max(3),
+  emotion: z.enum(['neutral', 'happy', 'confused', 'sad', 'angry']), provider: z.string(), isMock: z.boolean() });
 export async function aiRequest(path: string, body?: unknown, form?: FormData) {
   if (!process.env.MALO_AI_URL) throw new ApiError('AI_NOT_CONFIGURED', 'AI 서버 연결 설정이 필요합니다.', 503, true);
   try {
@@ -21,20 +24,31 @@ export async function aiRequest(path: string, body?: unknown, form?: FormData) {
   }
 }
 export async function evaluate(scenario: Scenario, node: SceneNode, text: string, mode: 'mock' | 'live', metrics: MetricsValue | null = null, history: { user: string; npc: string }[] = []) {
+  const support = learningSupport(scenario, node);
   if (mode === 'mock') {
     const bad = text === node.choices[2]?.text || /닥쳐|멍청|꺼져|니가 알아서|몰라요|싫어요|shut up|whatever/i.test(text);
     const unclear = text === node.choices[0].text || text.length < 4 || /^(yes|no|ok|네|응|아니)[.!]?$/i.test(text);
-    const outcome = bad ? 'misunderstanding' : unclear ? 'clarify' : 'correct';
+    const native = isOtherLanguage(text, scenario.pack);
+    const outcome = native ? 'clarify' : bad ? 'misunderstanding' : unclear ? 'clarify' : 'correct';
     return Grade.parse({ outcome, confidence: bad ? 0.98 : unclear ? 0.4 : 0.85, toneScore: bad ? 32 : unclear ? 55 : 92,
       toneLabel: bad ? '배려하는 표현으로 바꿔보세요' : unclear ? '조금 더 구체적으로' : '의도가 잘 전달됐어요',
-      feedback: bad ? '상대의 입장을 고려한 표현을 연습해보세요.' : unclear ? '이번 목표에 맞는 행동이나 시간을 덧붙여보세요.' : '좋아요. 의사를 구체적으로 전했어요.',
+      native, feedback: native ? '모국어로 먼저 답해도 괜찮아요. 아래 표현을 참고해 학습 언어로 다시 말해 보세요.' : bad ? '상대의 입장을 고려한 표현을 연습해보세요.' : unclear ? '이번 목표에 맞는 행동이나 시간을 덧붙여보세요.' : '좋아요. 의사를 구체적으로 전했어요.',
       betterExpression: node.goodExample, reason: node.tip, npcReply: scenario.pack === 'ko' ? (outcome === 'correct' ? '좋아요. 계속 이야기해 볼까요?' : '어떤 뜻인지 조금 더 설명해 줄래요?') : (outcome === 'correct' ? 'That makes sense.' : 'Could you explain a little more?'),
+      action: outcome === 'correct' ? '고개를 끄덕이며 답한다.' : '고개를 살짝 기울이고 다시 묻는다.',
+      cues: [{ k: '표정', v: outcome === 'correct' ? '미소를 짓는다.' : '눈썹을 살짝 올리고 상대를 바라본다.' }], views: support.views,
       emotion: bad ? 'confused' : unclear ? 'neutral' : 'happy', provider: 'mock', isMock: true });
   }
   const result = Grade.safeParse(await aiRequest('/v1/turns/evaluate', { mode, pack: scenario.pack, characterId: scenario.characterId, personalityId: scenario.personalityId,
-    situation: scenario.situation, node, text, history: history.slice(-12), audioMetrics: metrics }));
+    situation: scenario.situation, node: { ...node, ...support }, text, history: history.slice(-12), audioMetrics: metrics }));
   if (!result.success) throw new ApiError('AI_RESPONSE_INVALID', 'AI 응답을 확인하지 못했어요. 체력 차감 없이 다시 시도해 주세요.', 502, true);
-  return result.data;
+  const grade = result.data;
+  // Language help is a retry, even if a provider incorrectly graded it as a clear mistake.
+  if (grade.native || isOtherLanguage(text, scenario.pack)) return { ...grade, native: true, outcome: 'clarify' as const };
+  return grade;
+}
+export function isOtherLanguage(text: string, pack: 'ko' | 'en') {
+  if (!/\p{L}/u.test(text)) return false;
+  return pack === 'ko' ? !/[\uac00-\ud7a3\u1100-\u11ff\u3130-\u318f]/u.test(text) : !/[a-z]/i.test(text);
 }
 export async function audioBytes(assetId: string) {
   try {
