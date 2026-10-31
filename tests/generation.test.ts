@@ -21,7 +21,7 @@ test('Durable generation resumes checkpoints, migrates ownership, publishes only
  assert.equal((await api('/chapter-generations',{...input,prompt:'다른 내용'},a.accessToken)).status,409);
  assert.equal((await api('/chapter-generations/'+job.id,undefined,b.accessToken)).status,404);
  const realFetch=globalThis.fetch;
- globalThis.fetch=async(url)=>{const path=String(url);if(path.endsWith('/outline'))return Response.json({outline});if(path.endsWith('/lesson'))return Response.json({lesson:lesson()});if(path.endsWith('/evaluate'))return Response.json({outcome:'correct',confidence:.99,toneScore:95,native:false,toneLabel:'정중해요',feedback:'의도가 전달됐어요.',betterExpression:'확인해 주셔서 감사합니다.',reason:'상대 의사를 존중했어요.',npcReply:'연장은 어렵지만 다음 과제를 준비해 보세요.',action:'고개를 끄덕인다.',cues:[{k:'표정',v:'차분하다.'}],views:[{who:'교수님',meaning:'감사합니다.',cue:'정중한 말투'},{who:'친구',meaning:'고마워.',cue:'편한 말투'}],emotion:'neutral',provider:'live-test',isMock:false,routeId:'considerate',endingId:'deferred'});throw new Error('Unexpected provider call');};
+ globalThis.fetch=async(url)=>{const path=String(url);if(path.endsWith('/outline'))return Response.json({outline});if(path.endsWith('/lesson'))return Response.json({lesson:lesson()});if(path.endsWith('/evaluate'))return Response.json({reaction:'neutral',goalAchieved:true,outcome:'correct',confidence:.99,toneScore:95,native:false,toneLabel:'정중해요',feedback:'의도가 전달됐어요.',betterExpression:'확인해 주셔서 감사합니다.',reason:'상대 의사를 존중했어요.',npcReply:'연장은 어렵지만 다음 과제를 준비해 보세요.',action:'고개를 끄덕인다.',cues:[{k:'표정',v:'차분하다.'}],views:[{who:'교수님',meaning:'감사합니다.',cue:'정중한 말투'},{who:'친구',meaning:'고마워.',cue:'편한 말투'}],emotion:'neutral',provider:'live-test',isMock:false,routeId:'considerate',endingId:'deferred'});throw new Error('Unexpected provider call');};
  try{
   await workOne();await workOne();
   assert.equal((await rows('malo_user_chapters',{owner_id:a.user.id})).length,0);
@@ -36,7 +36,7 @@ test('Durable generation resumes checkpoints, migrates ownership, publishes only
   let last;
   for(let i=0;i<8;i++){last=await api('/sessions/'+play.id+'/turns',{clientTurnId:'t'+i,inputType:'text',text:'교수님, 정중히 부탁드립니다.'},b.accessToken);assert.equal(last.status,200);if(i===3)assert.equal(last.data.session.npc.text,'고려 경로 대사');}
   assert.equal(last!.data.result.passed,true);assert.equal(last!.data.result.ending.id,'deferred');assert.equal(last!.data.result.nextSceneId,job.id+'-2');
-  assert.equal(last!.data.turn.isMock,false);
+  assert.equal(last!.data.turn.isMock,false);assert.equal(last!.data.turn.evaluation.reaction,'neutral');assert.equal(last!.data.turn.mark,'△');assert.equal(last!.data.result.score,65);
  }finally{globalThis.fetch=realFetch;}
 });
 test('DB character data is the read source and push endpoints reject private-network targets',async()=>{

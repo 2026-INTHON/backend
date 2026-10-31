@@ -1,3 +1,4 @@
+import {assess} from './reaction';
 import * as Content from './content';
 import { createHash, randomUUID } from 'node:crypto';
 import { characters, findScenario, learningSupport, listScenes, sceneSummary, type Scenario } from './catalog';
@@ -22,7 +23,7 @@ export function publicPlay(play: Play): SessionValue {
   return { id: play.id, sceneId: play.sceneId, characterId: s.characterId, personalityId: s.personalityId, pack: s.pack, aiMode: play.aiMode,
     status: play.status, lives: play.lives, initialLives: 3, nodeIndex: play.nodeIndex, nodeCount: s.nodes.length,
     briefing: { partner: characters.find(c => c.id === s.characterId)?.role || s.characterId, situation: s.situation, goal: s.goal },
-    npc: { text: node.npcText, emotion: play.emotion, assetKey: `characters/${s.characterId}/${play.emotion}`, action, cues },
+    npc: {gesture:play.gesture||'idle',render:null, subtitle:play.subtitles?.[node.npcText]?{language:play.subtitleLanguage||'en',text:play.subtitles[node.npcText]}:null,audioUrl:null,text: node.npcText, emotion: play.emotion, assetKey: `characters/${s.characterId}/${play.emotion}`, action, cues },
     chapterId:s.chapterId||null, backgroundUrl:s.backgroundUrl||null, branchId:play.branchId||null, choices: play.status === 'active' ? node.choices : [], hintsUsed: play.hintsUsed, createdAt: play.createdAt, updatedAt: play.updatedAt };
 }
 function streak(days: string[]) {
@@ -55,11 +56,14 @@ export function records(p: Profile) {
     frequentMistakes: ['politeness', 'clarity'].map(category => ({ category, count: p.state.mistakes.filter(m => m.category === category).length })).filter(c => c.count),
     streak: streak(p.state.attendance.days), recentSessions: [...p.state.plays].reverse().slice(0, 20).map(s => ({ sessionId: s.id, title: s.scenario.title, status: s.status, score: s.result?.score ?? null, createdAt: s.createdAt })) };
 }
-export async function createPlay(id: string, sceneId: string, aiMode: 'mock' | 'live', customScenario?: Scenario) {
-  const scenario = customScenario || await Content.scene(sceneId,id);
+export async function createPlay(id: string, sceneId: string, aiMode: 'mock' | 'live', customScenario?: Scenario, personalityId?:string,subtitleLanguage?:'en'|'ja'|'zh'|'vi'|'es'|'id'|'ko') {
+  let scenario = customScenario || await Content.scene(sceneId,id);
   if (!scenario) throw new ApiError('SCENE_NOT_FOUND', '장면을 찾지 못했어요.', 404);
+  if(personalityId&&scenario.source!=='personal'){await Content.persona(scenario.characterId,personalityId);scenario={...scenario,personalityId};}
   if(scenario.source==='personal'||scenario.source==='curriculum')aiMode='live';
-  const play: Play = { id: randomUUID(), sceneId, scenario, aiMode, status: 'active', lives: 3, nodeIndex: 0, hintsUsed: 0, emotion: 'neutral', turns: [], history: [], result: null, createdAt: now(), updatedAt: now() };
+  let subtitles:Record<string,string>={};
+  if(aiMode==='live'&&subtitleLanguage){const texts=[...new Set([...scenario.nodes.map(n=>n.npcText),...(scenario.routes||[]).flatMap(r=>r.overrides.map(n=>n.npcText))])];const translated=await aiRequest('/v1/subtitles',{language:subtitleLanguage,texts});if(!Array.isArray(translated.texts)||translated.texts.length!==texts.length)throw new ApiError('SUBTITLE_INVALID','자막을 확인하지 못했어요.',502,true);subtitles=Object.fromEntries(texts.map((text,i)=>[text,translated.texts[i]]));}
+  const play: Play = { id: randomUUID(), sceneId, scenario, aiMode,subtitleLanguage,subtitles, status: 'active', lives: 3, nodeIndex: 0, hintsUsed: 0, emotion: 'neutral', turns: [], history: [], result: null, createdAt: now(), updatedAt: now() };
   await mutate(id, p => {
     if (p.state.plays.length >= 500) throw new ApiError('DEMO_STORAGE_LIMIT', '시연용 장면 저장 한도에 도달했어요.', 409);
     p.state.plays.push(play); p.state.settings.pack = scenario.pack;
@@ -94,10 +98,11 @@ function finish(p: Profile, play: Play) {
   if (play.result) return;
   const good = play.history.filter(t => t.outcome === 'correct'), bad = play.history.filter(t => t.outcome === 'misunderstanding' && !t.native);
   const passed = play.status === 'succeeded';
+  const quality=good.reduce((sum,t)=>sum+(t.evaluation?.reaction==='neutral'?.65:1),0);
   const rewardCoins = passed ? 30 : 5;
-  play.result = { sessionId: play.id, passed, score: Math.max(0, Math.min(100, Math.round((good.length / play.scenario.nodes.length) * 100 - bad.length * 8 - play.hintsUsed * 2))),
-    goodUtterances: good.map(t => ({ text: t.text, reason: t.feedback.reason })),
-    improvableUtterances: play.history.filter(t => t.outcome !== 'correct').map(t => ({ text: t.text, betterExpression: t.feedback.betterExpression, reason: t.feedback.reason, mistakeId: p.state.mistakes.find(m => m.turnId === t.id)?.id || null })),
+  play.result = { sessionId: play.id, passed, score: Math.max(0, Math.min(100, Math.round((quality / play.scenario.nodes.length) * 100 - bad.length * 8 - play.hintsUsed * 2))),
+    goodUtterances: good.filter(t=>t.evaluation?.reaction!=='neutral').map(t => ({ text: t.text, reason: t.feedback.reason })),
+    improvableUtterances: play.history.filter(t => t.outcome !== 'correct'||t.evaluation?.reaction==='neutral').map(t => ({ text: t.text, betterExpression: t.feedback.betterExpression, reason: t.feedback.reason, mistakeId: p.state.mistakes.find(m => m.turnId === t.id)?.id || null })),
     rewardCoins, durationMs: Date.now() - Date.parse(play.createdAt), nextSceneId: play.scenario.nextSceneId ?? null, ending: play.scenario.endings?.find(e=>e.id===(play.status==='failed'?'breakdown':play.endingId||'happy')) ?? null,
     achievement: {
       reach: Math.round(good.length / play.scenario.nodes.length * 100),
@@ -142,26 +147,27 @@ export async function submitTurn(id: string, sessionId: string, input: TurnInput
   if (reservation.value.response) return reservation.value.response;
   const { play, text, metrics } = reservation.value;
   try {
-    const grade = await evaluate(play!.scenario, activeNode(play!), text!, play!.aiMode, metrics, play!.history.map(t => ({ user: t.text, npc: t.npcReply })), play!.nodeIndex===play!.scenario.branchAt ? (play!.scenario.routes||[]).map(r=>r.id) : [], play!.nodeIndex===play!.scenario.nodes.length-1 ? (play!.scenario.endings||[]).map(e=>e.id) : []);
+    const grade = await evaluate(play!.scenario, activeNode(play!), text!, play!.aiMode, metrics, play!.history.map(t => ({ user: t.text, npc: t.npcReply })), play!.nodeIndex===play!.scenario.branchAt ? (play!.scenario.routes||[]).map(r=>r.id) : [], play!.nodeIndex===play!.scenario.nodes.length-1 ? (play!.scenario.endings||[]).map(e=>e.id) : [],play!.subtitleLanguage||'en');
     const { value } = await mutate(id, p => {
       const current = getPlay(p, sessionId), stored = current.turns.find(t => t.id === turnId);
       if (!stored || stored.status !== 'pending' || current.nodeIndex !== play!.nodeIndex) throw new ApiError('TURN_SUPERSEDED', '장면 상태가 바뀌었어요. 다시 확인해 주세요.', 409, true);
-      const outcome = grade.outcome === 'misunderstanding' && grade.confidence < 0.75 ? 'clarify' : grade.outcome;
+      const assessment=assess(grade);
+      const outcome=assessment.outcome;
       const lifeDelta = outcome === 'misunderstanding' ? -1 : 0;
       const node = activeNode(current);
       const previous = current.history.slice(current.history.findLastIndex(t => t.outcome === 'correct') + 1).filter(t => !t.nodeId || t.nodeId === node.id);
       const turn: TurnValue = { id: turnId, clientTurnId: input.clientTurnId, inputType: input.inputType, text: text!, outcome, confidence: grade.confidence,
-        nodeId: node.id, mark: outcome === 'correct' ? 'O' : outcome === 'clarify' ? '△' : 'X', native: grade.native, attempt: previous.length + 1,
+        nodeId:node.id,mark:assessment.mark,evaluation:{...assessment,reasonSubtitle:assessment.reasonSubtitle?{language:current.subtitleLanguage||'en',text:assessment.reasonSubtitle}:null}, native: grade.native, attempt: previous.length + 1,
         comparison: previous.length ? { firstAnswer: previous[0].text, currentAnswer: text!, improved: outcome === 'correct' } : null,
         feedback: { tone: { score: grade.toneScore, label: grade.toneLabel, source: 'text_politeness' }, speed: metrics ? { value: metrics.speed, unit: metrics.speedUnit, estimated: true } : null,
           hesitation: metrics ? { pauseCount: metrics.pauseCount, fillerCount: metrics.fillerCount, estimated: true, note: '낮은 음량 구간과 추임새를 센 추정치예요. 심리 상태를 뜻하지 않아요.' } : null,
-          message: grade.feedback, betterExpression: grade.betterExpression, reason: grade.reason, views: grade.views }, npcReply: grade.npcReply, action: grade.action, cues: grade.cues, emotion: grade.emotion,
+          message: grade.feedback, betterExpression: grade.betterExpression, reason: assessment.reason, views: grade.views }, gesture:grade.gesture,render:null,npcReplySubtitle:grade.npcReplySubtitle?{language:current.subtitleLanguage||'en',text:grade.npcReplySubtitle}:null,audioUrl:null,npcReply: grade.npcReply, action: grade.action, cues: grade.cues, emotion: assessment.reaction,
         lifeDelta, provider: grade.provider, isMock: grade.isMock, createdAt: now() };
-      current.history.push(turn); current.lives += lifeDelta; current.emotion = grade.emotion; current.updatedAt = now();
+      current.history.push(turn); current.lives += lifeDelta; current.emotion = assessment.reaction; current.gesture=grade.gesture; current.updatedAt = now();
       let mistakeId: string | null = null;
       if (outcome !== 'correct' && !grade.native) {
         mistakeId = randomUUID();
-        p.state.mistakes.push({ id: mistakeId, sessionId, turnId, sceneTitle: current.scenario.title, original: text!, betterExpression: grade.betterExpression, reason: grade.reason,
+        p.state.mistakes.push({ id: mistakeId, sessionId, turnId, sceneTitle: current.scenario.title, original: text!, betterExpression: grade.betterExpression, reason: assessment.reason,
           category: outcome === 'misunderstanding' ? 'politeness' : 'clarity', pack: current.scenario.pack, practiceCount: 0, resolved: false, createdAt: now(), nodeIndex: current.nodeIndex, scenario: current.scenario, practiceRequests: {} });
       }
       if (current.lives <= 0) current.status = 'failed';

@@ -91,6 +91,56 @@
           "npc": {
             "type": "object",
             "properties": {
+              "gesture": {
+                "type": "string",
+                "enum": [
+                  "idle",
+                  "nod",
+                  "tilt",
+                  "thinking",
+                  "open_hand",
+                  "arms_crossed"
+                ],
+                "default": "idle"
+              },
+              "render": {
+                "$ref": "#/components/schemas/CharacterImageRender"
+              },
+              "subtitle": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "language": {
+                    "type": "string",
+                    "enum": [
+                      "en",
+                      "ja",
+                      "zh",
+                      "vi",
+                      "es",
+                      "id",
+                      "ko"
+                    ]
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "default": null,
+                "required": [
+                  "language",
+                  "text"
+                ]
+              },
+              "audioUrl": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "default": null
+              },
               "text": {
                 "type": "string"
               },
@@ -180,6 +230,56 @@
         "enum": [
           "ko",
           "en"
+        ]
+      },
+      "CharacterImageRender": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "assetKey": {
+            "type": "string"
+          },
+          "characterId": {
+            "type": "string"
+          },
+          "emotion": {
+            "$ref": "#/components/schemas/Emotion"
+          },
+          "gesture": {
+            "type": "string",
+            "enum": [
+              "idle",
+              "nod",
+              "tilt",
+              "thinking",
+              "open_hand",
+              "arms_crossed"
+            ]
+          },
+          "imageUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "requestedEmotion": {
+            "type": "string"
+          },
+          "requestedGesture": {
+            "type": "string"
+          }
+        },
+        "default": null,
+        "required": [
+          "assetKey",
+          "characterId",
+          "emotion",
+          "gesture",
+          "imageUrl",
+          "requestedEmotion",
+          "requestedGesture"
         ]
       },
       "Emotion": {
@@ -920,6 +1020,59 @@
               "improved"
             ]
           },
+          "evaluation": {
+            "$ref": "#/components/schemas/ReactionEvaluation"
+          },
+          "gesture": {
+            "type": "string",
+            "enum": [
+              "idle",
+              "nod",
+              "tilt",
+              "thinking",
+              "open_hand",
+              "arms_crossed"
+            ],
+            "default": "idle"
+          },
+          "render": {
+            "$ref": "#/components/schemas/CharacterImageRender"
+          },
+          "npcReplySubtitle": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "language": {
+                "type": "string",
+                "enum": [
+                  "en",
+                  "ja",
+                  "zh",
+                  "vi",
+                  "es",
+                  "id",
+                  "ko"
+                ]
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "default": null,
+            "required": [
+              "language",
+              "text"
+            ]
+          },
+          "audioUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null
+          },
           "npcReply": {
             "type": "string"
           },
@@ -1089,6 +1242,83 @@
           "who",
           "meaning",
           "cue"
+        ]
+      },
+      "ReactionEvaluation": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "reaction": {
+            "$ref": "#/components/schemas/Emotion"
+          },
+          "label": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "reasonSubtitle": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "language": {
+                "type": "string",
+                "enum": [
+                  "en",
+                  "ja",
+                  "zh",
+                  "vi",
+                  "es",
+                  "id",
+                  "ko"
+                ]
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "language",
+              "text"
+            ]
+          },
+          "goalAchieved": {
+            "type": "boolean"
+          },
+          "progression": {
+            "type": "string",
+            "enum": [
+              "advance",
+              "retry"
+            ]
+          },
+          "policyVersion": {
+            "type": "string",
+            "enum": [
+              "reaction-v1-draft"
+            ]
+          },
+          "provisional": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "default": null,
+        "required": [
+          "reaction",
+          "label",
+          "reason",
+          "reasonSubtitle",
+          "goalAchieved",
+          "progression",
+          "policyVersion",
+          "provisional"
         ]
       },
       "SubmitTurnResult": {
@@ -4025,7 +4255,7 @@
         "tags": [
           "Play"
         ],
-        "summary": "장면 시작 — 기본 mock, live 선택 가능",
+        "summary": "장면 시작 — FE는 live 명시, 기본 교육과정 성격 선택 가능",
         "security": [
           {
             "BearerAuth": []
@@ -4048,6 +4278,26 @@
                       "live"
                     ],
                     "default": "mock"
+                  },
+                  "personalityId": {
+                    "type": "string",
+                    "enum": [
+                      "strict",
+                      "playful",
+                      "calm"
+                    ]
+                  },
+                  "subtitleLanguage": {
+                    "type": "string",
+                    "enum": [
+                      "en",
+                      "ja",
+                      "zh",
+                      "vi",
+                      "es",
+                      "id",
+                      "ko"
+                    ]
                   }
                 },
                 "required": [
@@ -5750,7 +6000,7 @@
         "tags": [
           "Speech"
         ],
-        "summary": "현재 NPC 대사 TTS — 서명 URL 반환",
+        "summary": "현재 NPC 또는 지정한 반응 대사 TTS — 서명 URL 반환",
         "security": [
           {
             "BearerAuth": []
@@ -5773,7 +6023,12 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "properties": {}
+                "properties": {
+                  "turnId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
               }
             }
           }
@@ -6602,6 +6857,48 @@
                               "type": "number",
                               "minimum": 0,
                               "maximum": 100
+                            },
+                            "reaction": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "enum": [
+                                "happy",
+                                "neutral",
+                                "angry",
+                                "sad",
+                                "confused",
+                                null
+                              ],
+                              "default": null
+                            },
+                            "goalAchieved": {
+                              "type": [
+                                "boolean",
+                                "null"
+                              ],
+                              "default": null
+                            },
+                            "reasonSubtitle": {
+                              "type": "string",
+                              "default": ""
+                            },
+                            "gesture": {
+                              "type": "string",
+                              "enum": [
+                                "idle",
+                                "nod",
+                                "tilt",
+                                "thinking",
+                                "open_hand",
+                                "arms_crossed"
+                              ],
+                              "default": "idle"
+                            },
+                            "npcReplySubtitle": {
+                              "type": "string",
+                              "default": ""
                             },
                             "routeId": {
                               "type": [
@@ -7892,6 +8189,203 @@
                       "required": [
                         "previewOnly",
                         "realBilling",
+                        "items"
+                      ]
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string"
+                        },
+                        "apiVersion": {
+                          "type": "string",
+                          "enum": [
+                            "v1"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "requestId",
+                        "apiVersion"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/assets/characters": {
+      "get": {
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "표정·몸짓 이미지 목록 — 미리 로드하고 render.assetKey로 전환",
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "renderMode": {
+                          "type": "string",
+                          "enum": [
+                            "image_variants"
+                          ]
+                        },
+                        "runtimeImageApiCalls": {
+                          "type": "boolean",
+                          "enum": [
+                            false
+                          ]
+                        },
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "assetKey": {
+                                "type": "string"
+                              },
+                              "characterId": {
+                                "type": "string"
+                              },
+                              "emotion": {
+                                "$ref": "#/components/schemas/Emotion"
+                              },
+                              "gesture": {
+                                "type": "string",
+                                "enum": [
+                                  "idle",
+                                  "nod",
+                                  "tilt",
+                                  "thinking",
+                                  "open_hand",
+                                  "arms_crossed"
+                                ]
+                              },
+                              "imageUrl": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "assetKey",
+                              "characterId",
+                              "emotion",
+                              "gesture",
+                              "imageUrl"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "renderMode",
+                        "runtimeImageApiCalls",
                         "items"
                       ]
                     },
