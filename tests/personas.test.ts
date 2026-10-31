@@ -47,7 +47,7 @@ test('Compact card API exposes seven short fields per personality without prompt
     assert.deepEqual(Object.keys(profile).sort(),['name','occupation','age','hobbies','favoriteFoods','dislikes','currentInterests'].sort());
     for(const value of Object.values(profile).flat() as string[])assert.ok(value.length>0&&value.length<=30);
     for(const food of profile.favoriteFoods)assert.ok(personaPrompt(character,personality)!.profile.likes.includes(food));
-    assert.equal('cardProfile' in personaPrompt(character,personality)!,false);
+    assert.deepEqual(personaPrompt(character,personality)!.cardProfile.favoriteFoods,profile.favoriteFoods);
   }
   assert.equal((await app.request('/api/v1/characters/unknown/personalities/calm/profile')).status,422);
 });

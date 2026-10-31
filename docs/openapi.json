@@ -75,6 +75,13 @@
           "npc": {
             "type": "object",
             "properties": {
+              "speechLevel": {
+                "type": "string",
+                "enum": [
+                  "polite",
+                  "casual"
+                ]
+              },
               "gesture": {
                 "type": "string",
                 "enum": [
@@ -1355,9 +1362,23 @@
           "text": {
             "type": "string"
           },
+          "npcSpeechLevel": {
+            "type": "string",
+            "enum": [
+              "polite",
+              "casual"
+            ]
+          },
           "prompt": {
             "type": "object",
             "properties": {
+              "speechLevel": {
+                "type": "string",
+                "enum": [
+                  "polite",
+                  "casual"
+                ]
+              },
               "text": {
                 "type": "string"
               },
@@ -9631,6 +9652,18 @@
                         "evaluation": {
                           "type": "object",
                           "properties": {
+                            "npcSpeechLevel": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "enum": [
+                                "polite",
+                                "casual",
+                                null
+                              ],
+                              "default": null
+                            },
                             "conversationComplete": {
                               "type": "boolean",
                               "default": false
