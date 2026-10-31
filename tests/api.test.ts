@@ -113,3 +113,25 @@ test('Multipart files reach STT and return an editable draft without grading', a
     assert.equal((await request('/records', undefined, auth.accessToken)).data.totalTurns, 0);
   } finally { globalThis.fetch = oldFetch; if (oldUrl) process.env.MALO_AI_URL = oldUrl; else delete process.env.MALO_AI_URL; }
 });
+
+test('Persona catalog serves saved OpenAI assets without any generation request', async () => {
+  const oldFetch = globalThis.fetch, oldUrl = process.env.MALO_AI_URL;
+  const assetId = 'i_' + 'b'.repeat(40), calls: string[] = [];
+  process.env.MALO_AI_URL = 'http://internal-ai.test';
+  globalThis.fetch = (async (url, init) => {
+    calls.push(String(url)); assert.ok(!init?.method || init.method === 'GET');
+    if (String(url).endsWith('/v1/persona-assets')) return Response.json({ items: [{ assetKey: 'characters/girlfriend/neutral', assetId }] });
+    assert.ok(String(url).endsWith('/v1/images/' + assetId));
+    return new Response('RIFF0000WEBPtest', { headers: { 'Content-Type': 'image/webp' } });
+  }) as typeof fetch;
+  try {
+    const result = await request('/assets/personas');
+    assert.equal(result.data.length, 20); assert.ok(result.data[0].imageUrl.endsWith('/api/v1/images/' + assetId)); assert.equal(result.data[1].imageUrl, null);
+    const r = await app.request('/api/v1/images/' + assetId); assert.equal(r.status, 200); assert.equal(r.headers.get('Content-Type'), 'image/webp');
+    assert.ok(r.headers.get('Cache-Control')?.includes('immutable'));
+    assert.equal(calls.length, 2);
+    assert.equal((await app.request('/api/v1/images/invalid')).status, 404); assert.equal(calls.length, 2);
+    globalThis.fetch = (async () => { throw new Error('AI offline'); }) as typeof fetch;
+    assert.ok((await request('/assets/personas')).data.every((item: { imageUrl: unknown }) => item.imageUrl === null));
+  } finally { globalThis.fetch = oldFetch; if (oldUrl) process.env.MALO_AI_URL = oldUrl; else delete process.env.MALO_AI_URL; }
+});

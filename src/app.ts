@@ -9,7 +9,7 @@ import * as C from './contracts';
 import * as Auth from './auth';
 import * as Game from './game';
 import { characters, packs, listScenes, findScenario } from './catalog';
-import { aiRequest, audioBytes, Grade } from './ai';
+import { aiRequest, audioBytes, Grade, personaAssets, imageBytes } from './ai';
 import { mutate, dataMode } from './store';
 import { ApiError } from './errors';
 import type { Profile } from './models';
@@ -146,9 +146,17 @@ endpoint({ method: 'get', path: '/personality-customizations', tag: 'Preview', s
   run: () => ({ previewOnly: true, realBilling: false, items: characters[0].personalities.map(p => ({ id: p.id, name: p.name, description: p.description, priceCoins: 100, assetKey: p.assetKey })) }) });
 endpoint({ method: 'get', path: '/plans', tag: 'Preview', summary: '[화면용] 구독 혜택 — 실제 가격·결제 없음', output: preview,
   run: () => ({ previewOnly: true, realBilling: false, items: [{ id: 'free', name: '기본 연습', description: '준비된 캐릭터와 장면으로 연습', priceCoins: null, assetKey: null }, { id: 'plus-preview', name: 'Malo Plus 미리보기', description: '나만의 에피소드 만들기 — 해커톤에서는 기능 시연만 제공', priceCoins: null, assetKey: null }] }) });
-endpoint({ method: 'get', path: '/assets/personas', tag: 'Catalog', summary: '사전 생성 이미지 연결용 assetKey — 현재 미등록', auth: false,
+endpoint({ method: 'get', path: '/assets/personas', tag: 'Catalog', summary: 'OpenAI로 생성·저장된 캐릭터 이미지 — 조회는 과금 없음', auth: false,
   output: z.array(z.object({ assetKey: z.string(), characterId: z.string(), emotion: C.Emotion, imageUrl: z.string().nullable(), source: z.literal('pre_generated') })),
-  run: () => characters.flatMap(c => C.Emotion.options.map(emotion => ({ assetKey: `characters/${c.id}/${emotion}`, characterId: c.id, emotion, imageUrl: null, source: 'pre_generated' as const }))) });
+  run: c => personaAssets(process.env.MALO_PUBLIC_BASE_URL || new URL(c.req.url).origin) });
+app.get('/images/:assetId', async c => {
+  const id = c.req.param('assetId');
+  if (!/^i_[a-f0-9]{40}$/.test(id)) throw new ApiError('IMAGE_NOT_FOUND', '이미지를 찾지 못했어요.', 404);
+  const bytes = await imageBytes(id);
+  c.header('Content-Type', 'image/webp'); c.header('Cache-Control', 'public, max-age=31536000, immutable');
+  return c.body(bytes);
+});
+app.openAPIRegistry.registerPath({ method: 'get', path: '/images/{assetId}', tags: ['Catalog'], summary: '공유 캐릭터 WebP 이미지 — 영구 캐시 가능한 콘텐츠 해시 URL', request: { params: z.object({ assetId: z.string().regex(/^i_[a-f0-9]{40}$/) }) }, responses: { 200: { description: 'WebP, no generation API call', content: { 'image/webp': { schema: { type: 'string', format: 'binary' } } } } } });
 
 export const documentConfig = { openapi: '3.1.0' as const, info: { title: 'Malo Backend API', version: '0.1.0', description: 'React Native + Expo FE용 API. 기본 Mock 채점, 선택 시 Live AI. Guest 영속 저장 및 Google 회원 이관. 상점/구독은 화면용 데이터만 제공합니다.' }, servers: [{ url: '/', description: '현재 서버' }], security: [] };
 app.doc31('/openapi.json', documentConfig);

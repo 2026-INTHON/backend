@@ -74,9 +74,11 @@ TTS URL은 10분 유효합니다. 만료되면 `/speech`를 다시 호출합니�
 | 설정 | `GET/PATCH /settings` — pack/voiceSpeed/subtitles/notifications |
 | 재화 | `GET /wallet`, `GET /wallet/transactions` |
 | 상점/성격/요금제 | `GET /shop`, `/personality-customizations`, `/plans` — previewOnly=true |
-| 이미지 | `GET /assets/personas` — assetKey에 사전 생성 이미지를 매핑. 현재 imageUrl=null |
+| 이미지 | `GET /assets/personas` — assetKey별 OpenAI 생성 이미지의 imageUrl. 미생성/오프라인 항목만 null |
 
 알림 설정은 선호 저장까지만 합니다. Push 발송, 스토어 결제, 아이템 구매, 커스텀 성격 저장은 이번 MVP 범위가 아닙니다. 재화는 가상 값이며 실제 금액과 연결되지 않습니다.
+
+캐릭터 이미지는 `assetKey`(예: `characters/girlfriend/happy`)에 맞는 `imageUrl`을 `expo-image`의 source로 사용하세요. [Expo Image](https://docs.expo.dev/versions/latest/sdk/image/)는 Expo Go에 포함되고 iOS·Android에서 WebP와 디스크 캐시를 지원합니다. 투명 배경 WebP이며 콘텐츠 해시 URL이라 영구 캐시할 수 있습니다. 조회·화면 전환·재접속은 이미지 생성 API를 호출하지 않으므로 생성 비용이 추가되지 않습니다. 카탈로그 조회 시 생성 중이거나 AI 서버가 오프라인이면 null을 받을 수 있으므로 placeholder를 표시하세요. 운영자의 AI 서비스 전용 생성 API 토큰은 FE에 넣지 않습니다.
 
 ## 회원 전환
 

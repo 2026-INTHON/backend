@@ -1,5 +1,5 @@
 import { z } from './contracts';
-import type { Scenario, SceneNode } from './catalog';
+import { characters, type Scenario, type SceneNode } from './catalog';
 import type { MetricsValue } from './contracts';
 import { ApiError } from './errors';
 
@@ -42,4 +42,30 @@ export async function audioBytes(assetId: string) {
     if (!response.ok) throw new Error('audio');
     return new Uint8Array(await response.arrayBuffer());
   } catch { throw new ApiError('AUDIO_UNAVAILABLE', '음성을 불러오지 못했어요. 다시 재생해 주세요.', 502, true); }
+}
+
+export async function personaAssets(baseUrl: string) {
+  const fallback = characters.flatMap(c => ['neutral', 'happy', 'confused', 'sad', 'angry'].map(emotion => ({
+    assetKey: `characters/${c.id}/${emotion}`, characterId: c.id, emotion, imageUrl: null as string | null, source: 'pre_generated' as const,
+  })));
+  if (!process.env.MALO_AI_URL) return fallback;
+  try {
+    // Read-only catalog: never generate or charge on an app's GET request.
+    const r = await fetch(`${process.env.MALO_AI_URL}/v1/persona-assets`, { headers: { 'X-AI-Service-Token': process.env.MALO_AI_SERVICE_TOKEN || '' }, signal: AbortSignal.timeout(4000) });
+    if (!r.ok) return fallback;
+    const data = z.object({ items: z.array(z.object({ assetKey: z.string(), assetId: z.string().regex(/^i_[a-f0-9]{40}$/).nullable() })) }).parse(await r.json());
+    return fallback.map(item => { const asset = data.items.find(a => a.assetKey === item.assetKey); return { ...item, imageUrl: asset?.assetId ? `${baseUrl}/api/v1/images/${asset.assetId}` : null }; });
+  } catch { return fallback; }
+}
+
+export async function imageBytes(assetId: string) {
+  try {
+    const r = await fetch(`${process.env.MALO_AI_URL}/v1/images/${assetId}`, { headers: { 'X-AI-Service-Token': process.env.MALO_AI_SERVICE_TOKEN || '' }, signal: AbortSignal.timeout(15000) });
+    if (r.status === 404) throw new ApiError('IMAGE_NOT_FOUND', '이미지를 찾지 못했어요.', 404);
+    if (!r.ok) throw new Error('image');
+    return new Uint8Array(await r.arrayBuffer());
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError('IMAGE_UNAVAILABLE', '이미지를 불러오지 못했어요.', 502, true);
+  }
 }

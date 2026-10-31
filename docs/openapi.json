@@ -7201,7 +7201,7 @@
         "tags": [
           "Catalog"
         ],
-        "summary": "사전 생성 이미지 연결용 assetKey — 현재 미등록",
+        "summary": "OpenAI로 생성·저장된 캐릭터 이미지 — 조회는 과금 없음",
         "responses": {
           "200": {
             "description": "성공",
@@ -7359,6 +7359,38 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/images/{assetId}": {
+      "get": {
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "공유 캐릭터 WebP 이미지 — 영구 캐시 가능한 콘텐츠 해시 URL",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^i_[a-f0-9]{40}$"
+            },
+            "required": true,
+            "name": "assetId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "WebP, no generation API call",
+            "content": {
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
                 }
               }
             }
