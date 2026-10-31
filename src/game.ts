@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { characters, findScenario, listScenes, sceneSummary, type Scenario } from './catalog';
+import { characters, findScenario, learningSupport, listScenes, sceneSummary, type Scenario } from './catalog';
 import { aiRequest, evaluate } from './ai';
 import type { MetricsValue, SessionValue, TurnValue } from './contracts';
 import type { Play, Profile, SavedMistake, TurnResponse } from './models';
@@ -16,10 +16,11 @@ export function getPlay(p: Profile, id: string) {
 }
 export function publicPlay(play: Play): SessionValue {
   const s = play.scenario, node = s.nodes[Math.min(play.nodeIndex, s.nodes.length - 1)];
+  const { action, cues } = learningSupport(s, node);
   return { id: play.id, sceneId: play.sceneId, characterId: s.characterId, personalityId: s.personalityId, pack: s.pack, aiMode: play.aiMode,
     status: play.status, lives: play.lives, initialLives: 3, nodeIndex: play.nodeIndex, nodeCount: s.nodes.length,
     briefing: { partner: characters.find(c => c.id === s.characterId)?.role || s.characterId, situation: s.situation, goal: s.goal },
-    npc: { text: node.npcText, emotion: play.emotion, assetKey: `characters/${s.characterId}/${play.emotion}` },
+    npc: { text: node.npcText, emotion: play.emotion, assetKey: `characters/${s.characterId}/${play.emotion}`, action, cues },
     choices: play.status === 'active' ? node.choices : [], hintsUsed: play.hintsUsed, createdAt: play.createdAt, updatedAt: play.updatedAt };
 }
 function streak(days: string[]) {
@@ -39,6 +40,21 @@ export function home(p: Profile) {
   const celebration = attendance.current > 0 && !p.state.attendance.acknowledged.includes(day()) ? { id: day(), days: attendance.current, message: `${attendance.current}일째 말하기 연습 중!` } : null;
   return { user: publicUser(p), wallet: wallet(p), settings: p.state.settings, resumeSession: resume ? publicPlay(resume) : null,
     todayScene: resume ? sceneSummary(resume.scenario, resume.sceneId) : scenes[0], otherScenes: scenes, celebration };
+}
+export function chapters(p: Profile, pack: 'ko' | 'en', characterId?: string) {
+  return characters.filter(c => !characterId || c.id === characterId).map((character, index) => {
+    const scenes = listScenes(pack, character.id);
+    const active = [...p.state.plays].reverse().find(play => play.scenario.pack === pack && play.scenario.characterId === character.id && ['active', 'paused'].includes(play.status));
+    const current = active?.sceneId || scenes.find(scene => !p.state.plays.some(play => play.sceneId === scene.id && play.status === 'succeeded'))?.id;
+    return { id: `${pack}-${character.id}`, no: index + 1, characterId: character.id, title: `${character.name}와 대화하기`, desc: character.description, locked: false,
+      subs: scenes.map(scene => {
+        const completed = p.state.plays.filter(play => play.sceneId === scene.id && play.status === 'succeeded');
+        return { id: scene.id, sceneId: scene.id, personalityId: scene.personalityId,
+          title: `${scene.title} · ${character.personalities.find(item => item.id === scene.personalityId)!.name}`,
+          state: completed.length ? 'done' as const : current === scene.id ? 'now' as const : 'open' as const,
+          score: completed.length ? Math.max(...completed.map(play => play.result?.score || 0)) : null };
+      }) };
+  });
 }
 export function records(p: Profile) {
   const turns = p.state.plays.flatMap(s => s.history);
@@ -64,6 +80,19 @@ export async function createPlay(id: string, sceneId: string, aiMode: 'mock' | '
 function assertNoPending(play: Play) {
   if (play.turns.some(t => t.status === 'pending')) throw new ApiError('TURN_IN_PROGRESS', '이전 답변을 처리 중이에요.', 409, true);
 }
+export async function revealHint(id: string, sessionId: string, step: 1 | 2) {
+  return (await mutate(id, p => {
+    const play = getPlay(p, sessionId); assertNoPending(play);
+    if (play.status !== 'active') throw new ApiError('SESSION_NOT_ACTIVE', '진행 중인 장면에서 사용할 수 있어요.', 409);
+    const node = play.scenario.nodes[play.nodeIndex];
+    const key = `${node.id}:${step}`;
+    play.hintKeys ||= [];
+    if (!play.hintKeys.includes(key)) { play.hintKeys.push(key); play.hintsUsed++; play.updatedAt = now(); }
+    return { nodeId: node.id, step, clue: learningSupport(play.scenario, node).clue,
+      hiddenThought: step === 2 ? node.hiddenThought : null, tip: step === 2 ? node.tip : null,
+      isFictional: true as const, session: publicPlay(play) };
+  })).value;
+}
 export async function transition(id: string, sessionId: string, action: 'pause' | 'resume' | 'abandon') {
   const { value } = await mutate(id, p => {
     const play = getPlay(p, sessionId); assertNoPending(play);
@@ -74,13 +103,18 @@ export async function transition(id: string, sessionId: string, action: 'pause' 
 }
 function finish(p: Profile, play: Play) {
   if (play.result) return;
-  const good = play.history.filter(t => t.outcome === 'correct'), bad = play.history.filter(t => t.outcome === 'misunderstanding');
+  const good = play.history.filter(t => t.outcome === 'correct'), bad = play.history.filter(t => t.outcome === 'misunderstanding' && !t.native);
   const passed = play.status === 'succeeded';
   const rewardCoins = passed ? 30 : 5;
   play.result = { sessionId: play.id, passed, score: Math.max(0, Math.min(100, Math.round((good.length / play.scenario.nodes.length) * 100 - bad.length * 8 - play.hintsUsed * 2))),
     goodUtterances: good.map(t => ({ text: t.text, reason: t.feedback.reason })),
     improvableUtterances: play.history.filter(t => t.outcome !== 'correct').map(t => ({ text: t.text, betterExpression: t.feedback.betterExpression, reason: t.feedback.reason, mistakeId: p.state.mistakes.find(m => m.turnId === t.id)?.id || null })),
-    rewardCoins, durationMs: Date.now() - Date.parse(play.createdAt), nextSceneId: listScenes(play.scenario.pack).find(s => s.id !== play.sceneId)?.id || null };
+    rewardCoins, durationMs: Date.now() - Date.parse(play.createdAt), nextSceneId: listScenes(play.scenario.pack).find(s => s.id !== play.sceneId)?.id || null,
+    achievement: {
+      reach: Math.round(good.length / play.scenario.nodes.length * 100),
+      infer: Math.max(30, 100 - (play.hintKeys || []).filter(k => k.endsWith(':1')).length * 15 - ((play.hintKeys || []).filter(k => k.endsWith(':2')).length + Math.max(0, play.hintsUsed - (play.hintKeys || []).length)) * 25),
+      self: Math.max(30, 100 - play.history.filter(t => t.native).length * 25 - bad.length * 15),
+    } };
   p.state.coins += rewardCoins; p.state.ledger.push({ id: `result:${play.id}`, amount: rewardCoins, reason: passed ? '장면 완료' : '다시 도전 응원', createdAt: now() });
   p.state.attendance.days = [...new Set([...p.state.attendance.days, day()])].sort();
   p.state.attendance.longest = streak(p.state.attendance.days).longest;
@@ -125,14 +159,18 @@ export async function submitTurn(id: string, sessionId: string, input: TurnInput
       if (!stored || stored.status !== 'pending' || current.nodeIndex !== play!.nodeIndex) throw new ApiError('TURN_SUPERSEDED', '장면 상태가 바뀌었어요. 다시 확인해 주세요.', 409, true);
       const outcome = grade.outcome === 'misunderstanding' && grade.confidence < 0.75 ? 'clarify' : grade.outcome;
       const lifeDelta = outcome === 'misunderstanding' ? -1 : 0;
+      const node = current.scenario.nodes[current.nodeIndex];
+      const previous = current.history.slice(current.history.findLastIndex(t => t.outcome === 'correct') + 1).filter(t => !t.nodeId || t.nodeId === node.id);
       const turn: TurnValue = { id: turnId, clientTurnId: input.clientTurnId, inputType: input.inputType, text: text!, outcome, confidence: grade.confidence,
+        nodeId: node.id, mark: outcome === 'correct' ? 'O' : outcome === 'clarify' ? '△' : 'X', native: grade.native, attempt: previous.length + 1,
+        comparison: previous.length ? { firstAnswer: previous[0].text, currentAnswer: text!, improved: outcome === 'correct' } : null,
         feedback: { tone: { score: grade.toneScore, label: grade.toneLabel, source: 'text_politeness' }, speed: metrics ? { value: metrics.speed, unit: metrics.speedUnit, estimated: true } : null,
           hesitation: metrics ? { pauseCount: metrics.pauseCount, fillerCount: metrics.fillerCount, estimated: true, note: '낮은 음량 구간과 추임새를 센 추정치예요. 심리 상태를 뜻하지 않아요.' } : null,
-          message: grade.feedback, betterExpression: grade.betterExpression, reason: grade.reason }, npcReply: grade.npcReply, emotion: grade.emotion,
+          message: grade.feedback, betterExpression: grade.betterExpression, reason: grade.reason, views: grade.views }, npcReply: grade.npcReply, action: grade.action, cues: grade.cues, emotion: grade.emotion,
         lifeDelta, provider: grade.provider, isMock: grade.isMock, createdAt: now() };
       current.history.push(turn); current.lives += lifeDelta; current.emotion = grade.emotion; current.updatedAt = now();
       let mistakeId: string | null = null;
-      if (outcome !== 'correct') {
+      if (outcome !== 'correct' && !grade.native) {
         mistakeId = randomUUID();
         p.state.mistakes.push({ id: mistakeId, sessionId, turnId, sceneTitle: current.scenario.title, original: text!, betterExpression: grade.betterExpression, reason: grade.reason,
           category: outcome === 'misunderstanding' ? 'politeness' : 'clarity', pack: current.scenario.pack, practiceCount: 0, resolved: false, createdAt: now(), nodeIndex: current.nodeIndex, scenario: current.scenario, practiceRequests: {} });
@@ -157,7 +195,12 @@ export async function practice(id: string, mistakeId: string, input: { clientTur
   if (!mistake) throw new ApiError('MISTAKE_NOT_FOUND', '오답을 찾지 못했어요.', 404);
   const key = createHash('sha256').update(JSON.stringify(input)).digest('hex');
   const cached = mistake.practiceRequests[input.clientTurnId] as { key: string; response: unknown } | undefined;
-  if (cached) { if (cached.key !== key) throw new ApiError('IDEMPOTENCY_CONFLICT', '같은 ID에 다른 답변을 보낼 수 없어요.', 409); return cached.response; }
+  if (cached) {
+    if (cached.key !== key) throw new ApiError('IDEMPOTENCY_CONFLICT', '같은 ID에 다른 답변을 보낼 수 없어요.', 409);
+    // Cached practice results from before this contract keep their original evaluation and state.
+    const response = cached.response as { evaluation: Record<string, unknown> };
+    return { ...response, evaluation: { ...learningSupport(mistake.scenario, mistake.scenario.nodes[mistake.nodeIndex]), native: false, ...response.evaluation } };
+  }
   const grade = await evaluate(mistake.scenario, mistake.scenario.nodes[mistake.nodeIndex], input.text, input.aiMode);
   const { value } = await mutate(id, p => {
     const m = p.state.mistakes.find(m => m.id === mistakeId)!;

@@ -4,7 +4,7 @@ import type { MetricsValue, MistakeValue, ResultValue, SettingsValue, TurnValue 
 export type StoredTurn = { id: string; clientTurnId: string; inputHash: string; status: 'pending' | 'completed' | 'retryable_error'; response?: TurnResponse; errorCode?: string };
 export type Play = {
   id: string; sceneId: string; scenario: Scenario; aiMode: 'mock' | 'live'; status: 'active' | 'paused' | 'succeeded' | 'failed' | 'abandoned';
-  lives: number; nodeIndex: number; hintsUsed: number; emotion: 'neutral' | 'happy' | 'confused' | 'sad' | 'angry';
+  lives: number; nodeIndex: number; hintsUsed: number; hintKeys?: string[]; emotion: 'neutral' | 'happy' | 'confused' | 'sad' | 'angry';
   turns: StoredTurn[]; history: TurnValue[]; result: ResultValue | null; createdAt: string; updatedAt: string;
 };
 export type SavedMistake = MistakeValue & { nodeIndex: number; scenario: Scenario; practiceRequests: Record<string, unknown> };

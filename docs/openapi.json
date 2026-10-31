@@ -99,6 +99,17 @@
               },
               "assetKey": {
                 "type": "string"
+              },
+              "action": {
+                "type": "string",
+                "default": ""
+              },
+              "cues": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/NonverbalCue"
+                },
+                "default": []
               }
             },
             "required": [
@@ -158,6 +169,29 @@
           "confused",
           "sad",
           "angry"
+        ]
+      },
+      "NonverbalCue": {
+        "type": "object",
+        "properties": {
+          "k": {
+            "type": "string",
+            "enum": [
+              "표정",
+              "억양",
+              "망설임",
+              "침묵"
+            ]
+          },
+          "v": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400
+          }
+        },
+        "required": [
+          "k",
+          "v"
         ]
       },
       "Choice": {
@@ -244,6 +278,35 @@
             "type": [
               "string",
               "null"
+            ]
+          },
+          "achievement": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "reach": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "infer": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "self": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              }
+            },
+            "default": null,
+            "required": [
+              "reach",
+              "infer",
+              "self"
             ]
           }
         },
@@ -585,6 +648,81 @@
           "assetKey"
         ]
       },
+      "Chapter": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "no": {
+            "type": "number"
+          },
+          "characterId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "desc": {
+            "type": "string"
+          },
+          "locked": {
+            "type": "boolean"
+          },
+          "subs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "sceneId": {
+                  "type": "string"
+                },
+                "personalityId": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "done",
+                    "now",
+                    "open",
+                    "locked"
+                  ]
+                },
+                "score": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "sceneId",
+                "personalityId",
+                "state",
+                "score"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "no",
+          "characterId",
+          "title",
+          "desc",
+          "locked",
+          "subs"
+        ]
+      },
       "Turn": {
         "type": "object",
         "properties": {
@@ -620,8 +758,63 @@
           "feedback": {
             "$ref": "#/components/schemas/TurnFeedback"
           },
+          "nodeId": {
+            "type": "string",
+            "default": ""
+          },
+          "mark": {
+            "type": "string",
+            "enum": [
+              "O",
+              "△",
+              "X"
+            ]
+          },
+          "native": {
+            "type": "boolean",
+            "default": false
+          },
+          "attempt": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1
+          },
+          "comparison": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "firstAnswer": {
+                "type": "string"
+              },
+              "currentAnswer": {
+                "type": "string"
+              },
+              "improved": {
+                "type": "boolean"
+              }
+            },
+            "default": null,
+            "required": [
+              "firstAnswer",
+              "currentAnswer",
+              "improved"
+            ]
+          },
           "npcReply": {
             "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "default": ""
+          },
+          "cues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NonverbalCue"
+            },
+            "default": []
           },
           "emotion": {
             "$ref": "#/components/schemas/Emotion"
@@ -736,6 +929,14 @@
           },
           "reason": {
             "type": "string"
+          },
+          "views": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Perspective"
+            },
+            "maxItems": 3,
+            "default": []
           }
         },
         "required": [
@@ -745,6 +946,31 @@
           "message",
           "betterExpression",
           "reason"
+        ]
+      },
+      "Perspective": {
+        "type": "object",
+        "properties": {
+          "who": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "meaning": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1200
+          },
+          "cue": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400
+          }
+        },
+        "required": [
+          "who",
+          "meaning",
+          "cue"
         ]
       },
       "SubmitTurnResult": {
@@ -801,6 +1027,25 @@
           "result",
           "oopsMoment",
           "mistakeId"
+        ]
+      },
+      "HintClue": {
+        "type": "object",
+        "properties": {
+          "k": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "v": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1200
+          }
+        },
+        "required": [
+          "k",
+          "v"
         ]
       },
       "AudioAsset": {
@@ -2859,6 +3104,169 @@
         }
       }
     },
+    "/api/v1/chapters": {
+      "get": {
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "캐릭터별 챕터·성격별 서브 챕터와 내 진행 상태",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/Pack"
+            },
+            "required": false,
+            "name": "pack",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "characterId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Chapter"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string"
+                        },
+                        "apiVersion": {
+                          "type": "string",
+                          "enum": [
+                            "v1"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "requestId",
+                        "apiVersion"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/scenes": {
       "get": {
         "tags": [
@@ -4157,7 +4565,8 @@
         "tags": [
           "Play"
         ],
-        "summary": "가상 캐릭터의 속마음·학습 힌트",
+        "summary": "2단계 힌트 — 관찰 단서 → 가상 캐릭터의 속마음·표현 팁",
+        "description": "step=1은 주목 표현·행동·상황 단서만 반환하며 hiddenThought/tip은 null. step=2는 속마음과 표현 팁을 추가 공개. 같은 노드·단계의 재조회는 hintsUsed를 중복 증가시키지 않음. 기존 클라이언트의 {} 요청은 step=2로 처리.",
         "security": [
           {
             "BearerAuth": []
@@ -4180,7 +4589,25 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "properties": {}
+                "properties": {
+                  "step": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "enum": [
+                          1
+                        ]
+                      },
+                      {
+                        "type": "number",
+                        "enum": [
+                          2
+                        ]
+                      }
+                    ],
+                    "default": 2
+                  }
+                }
               }
             }
           }
@@ -4196,11 +4623,42 @@
                     "data": {
                       "type": "object",
                       "properties": {
-                        "hiddenThought": {
+                        "nodeId": {
                           "type": "string"
                         },
+                        "step": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "enum": [
+                                1
+                              ]
+                            },
+                            {
+                              "type": "number",
+                              "enum": [
+                                2
+                              ]
+                            }
+                          ]
+                        },
+                        "clue": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/HintClue"
+                          }
+                        },
+                        "hiddenThought": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "tip": {
-                          "type": "string"
+                          "type": [
+                            "string",
+                            "null"
+                          ]
                         },
                         "isFictional": {
                           "type": "boolean",
@@ -4213,6 +4671,9 @@
                         }
                       },
                       "required": [
+                        "nodeId",
+                        "step",
+                        "clue",
                         "hiddenThought",
                         "tip",
                         "isFictional",
@@ -5824,6 +6285,9 @@
                               "minimum": 0,
                               "maximum": 100
                             },
+                            "native": {
+                              "type": "boolean"
+                            },
                             "toneLabel": {
                               "type": "string"
                             },
@@ -5838,6 +6302,27 @@
                             },
                             "npcReply": {
                               "type": "string"
+                            },
+                            "action": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 400
+                            },
+                            "cues": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/NonverbalCue"
+                              },
+                              "minItems": 1,
+                              "maxItems": 5
+                            },
+                            "views": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/Perspective"
+                              },
+                              "minItems": 2,
+                              "maxItems": 3
                             },
                             "emotion": {
                               "type": "string",
@@ -5860,11 +6345,15 @@
                             "outcome",
                             "confidence",
                             "toneScore",
+                            "native",
                             "toneLabel",
                             "feedback",
                             "betterExpression",
                             "reason",
                             "npcReply",
+                            "action",
+                            "cues",
+                            "views",
                             "emotion",
                             "provider",
                             "isMock"
