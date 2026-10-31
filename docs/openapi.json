@@ -1039,6 +1039,12 @@
           },
           "level": {
             "type": "string"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/CharacterProfile"
+          },
+          "profileRevision": {
+            "type": "string"
           }
         },
         "required": [
@@ -1046,6 +1052,79 @@
           "name",
           "description",
           "assetKey"
+        ]
+      },
+      "CharacterProfile": {
+        "type": "object",
+        "properties": {
+          "age": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "occupation": {
+            "type": "string"
+          },
+          "introduction": {
+            "type": "string"
+          },
+          "relationship": {
+            "type": "string"
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "traits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "likes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "dislikes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "hobbies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "speakingStyle": {
+            "type": "string"
+          },
+          "sampleLines": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "age",
+          "role",
+          "occupation",
+          "introduction",
+          "relationship",
+          "values",
+          "traits",
+          "likes",
+          "dislikes",
+          "hobbies",
+          "speakingStyle",
+          "sampleLines"
         ]
       },
       "Chapter": {
