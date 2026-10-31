@@ -70,23 +70,7 @@
             "type": "number"
           },
           "briefing": {
-            "type": "object",
-            "properties": {
-              "partner": {
-                "type": "string"
-              },
-              "situation": {
-                "type": "string"
-              },
-              "goal": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "partner",
-              "situation",
-              "goal"
-            ]
+            "$ref": "#/components/schemas/SubchapterBriefing"
           },
           "npc": {
             "type": "object",
@@ -232,6 +216,69 @@
           "en"
         ]
       },
+      "SubchapterBriefing": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "default": ""
+          },
+          "partner": {
+            "type": "string"
+          },
+          "situation": {
+            "type": "string"
+          },
+          "goal": {
+            "type": "string"
+          },
+          "translation": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "language": {
+                "type": "string",
+                "enum": [
+                  "en",
+                  "ja",
+                  "zh",
+                  "vi",
+                  "es",
+                  "id",
+                  "ko"
+                ]
+              },
+              "title": {
+                "type": "string"
+              },
+              "partner": {
+                "type": "string"
+              },
+              "situation": {
+                "type": "string"
+              },
+              "goal": {
+                "type": "string"
+              }
+            },
+            "default": null,
+            "required": [
+              "language",
+              "title",
+              "partner",
+              "situation",
+              "goal"
+            ]
+          }
+        },
+        "required": [
+          "partner",
+          "situation",
+          "goal"
+        ]
+      },
       "CharacterImageRender": {
         "type": [
           "object",
@@ -335,6 +382,32 @@
         "properties": {
           "sessionId": {
             "type": "string"
+          },
+          "report": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "reportId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "queued",
+                  "running",
+                  "ready",
+                  "failed"
+                ]
+              }
+            },
+            "default": null,
+            "required": [
+              "reportId",
+              "status"
+            ]
           },
           "passed": {
             "type": "boolean"
@@ -985,7 +1058,8 @@
             "enum": [
               "O",
               "△",
-              "X"
+              "X",
+              "?"
             ]
           },
           "native": {
@@ -1250,8 +1324,23 @@
           "null"
         ],
         "properties": {
-          "reaction": {
-            "$ref": "#/components/schemas/Emotion"
+          "mark": {
+            "type": "string",
+            "enum": [
+              "O",
+              "△",
+              "X",
+              "?"
+            ]
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "excellent",
+              "acceptable",
+              "inappropriate",
+              "off_topic"
+            ]
           },
           "label": {
             "type": "string"
@@ -1299,7 +1388,8 @@
           "policyVersion": {
             "type": "string",
             "enum": [
-              "reaction-v1-draft"
+              "reaction-v1-draft",
+              "judgment-v2-draft"
             ]
           },
           "provisional": {
@@ -1311,7 +1401,8 @@
         },
         "default": null,
         "required": [
-          "reaction",
+          "mark",
+          "category",
           "label",
           "reason",
           "reasonSubtitle",
@@ -6346,6 +6437,1604 @@
         }
       }
     },
+    "/api/v1/sessions/{id}/report": {
+      "post": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "완료한 서브챕터의 상세 보고서 생성 예약·재조회",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "reportId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "queued",
+                            "running",
+                            "ready",
+                            "failed"
+                          ]
+                        },
+                        "error": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "properties": {
+                            "code": {
+                              "type": "string"
+                            },
+                            "message": {
+                              "type": "string"
+                            },
+                            "retryable": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "code",
+                            "message",
+                            "retryable"
+                          ]
+                        },
+                        "report": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "sessionId": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "sceneId": {
+                              "type": "string"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "language": {
+                              "type": "string",
+                              "enum": [
+                                "en",
+                                "ja",
+                                "zh",
+                                "vi",
+                                "es",
+                                "id",
+                                "ko"
+                              ]
+                            },
+                            "policyVersion": {
+                              "type": "string",
+                              "enum": [
+                                "report-v1-draft"
+                              ]
+                            },
+                            "provisional": {
+                              "type": "boolean",
+                              "enum": [
+                                true
+                              ]
+                            },
+                            "createdAt": {
+                              "type": "string"
+                            },
+                            "overview": {
+                              "type": "object",
+                              "properties": {
+                                "passed": {
+                                  "type": "boolean"
+                                },
+                                "score": {
+                                  "type": "number"
+                                },
+                                "grade": {
+                                  "type": "string"
+                                },
+                                "achievement": {
+                                  "type": [
+                                    "object",
+                                    "null"
+                                  ],
+                                  "properties": {
+                                    "reach": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 100
+                                    },
+                                    "infer": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 100
+                                    },
+                                    "self": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 100
+                                    }
+                                  },
+                                  "default": null,
+                                  "required": [
+                                    "reach",
+                                    "infer",
+                                    "self"
+                                  ]
+                                },
+                                "rewardCoins": {
+                                  "type": "number"
+                                },
+                                "elapsedMs": {
+                                  "type": "number"
+                                },
+                                "learnerTurns": {
+                                  "type": "number"
+                                },
+                                "judgmentCounts": {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "type": "number"
+                                  }
+                                }
+                              },
+                              "required": [
+                                "passed",
+                                "score",
+                                "grade",
+                                "rewardCoins",
+                                "elapsedMs",
+                                "learnerTurns",
+                                "judgmentCounts"
+                              ]
+                            },
+                            "summary": {
+                              "type": "object",
+                              "properties": {
+                                "headline": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 200
+                                },
+                                "overallFeedback": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 1200
+                                },
+                                "strengths": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "maxItems": 3
+                                },
+                                "improvements": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "maxItems": 3
+                                },
+                                "culturalTakeaways": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "minItems": 1,
+                                  "maxItems": 3
+                                },
+                                "nextPractice": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "minItems": 1,
+                                  "maxItems": 3
+                                }
+                              },
+                              "required": [
+                                "headline",
+                                "overallFeedback",
+                                "strengths",
+                                "improvements",
+                                "culturalTakeaways",
+                                "nextPractice"
+                              ]
+                            },
+                            "details": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "turnId": {
+                                    "type": "string"
+                                  },
+                                  "nodeId": {
+                                    "type": "string"
+                                  },
+                                  "attempt": {
+                                    "type": "number"
+                                  },
+                                  "comparison": {
+                                    "type": [
+                                      "object",
+                                      "null"
+                                    ],
+                                    "properties": {
+                                      "firstAnswer": {
+                                        "type": "string"
+                                      },
+                                      "currentAnswer": {
+                                        "type": "string"
+                                      },
+                                      "improved": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "default": null,
+                                    "required": [
+                                      "firstAnswer",
+                                      "currentAnswer",
+                                      "improved"
+                                    ]
+                                  },
+                                  "npcText": {
+                                    "type": "string"
+                                  },
+                                  "learnerText": {
+                                    "type": "string"
+                                  },
+                                  "native": {
+                                    "type": "boolean"
+                                  },
+                                  "assessmentSource": {
+                                    "type": "string",
+                                    "enum": [
+                                      "recorded",
+                                      "legacy"
+                                    ]
+                                  },
+                                  "legacyOutcome": {
+                                    "type": "string",
+                                    "enum": [
+                                      "correct",
+                                      "misunderstanding",
+                                      "clarify"
+                                    ]
+                                  },
+                                  "evaluation": {
+                                    "$ref": "#/components/schemas/ReactionEvaluation"
+                                  },
+                                  "originalIntent": {
+                                    "type": "string"
+                                  },
+                                  "implicitIntent": {
+                                    "type": "string"
+                                  },
+                                  "cues": {
+                                    "type": "array",
+                                    "items": {
+                                      "$ref": "#/components/schemas/NonverbalCue"
+                                    }
+                                  },
+                                  "culturalContext": {
+                                    "type": "string"
+                                  },
+                                  "feedback": {
+                                    "type": "string"
+                                  },
+                                  "feedbackTranslation": {
+                                    "type": [
+                                      "object",
+                                      "null"
+                                    ],
+                                    "properties": {
+                                      "language": {
+                                        "type": "string",
+                                        "enum": [
+                                          "en",
+                                          "ja",
+                                          "zh",
+                                          "vi",
+                                          "es",
+                                          "id",
+                                          "ko"
+                                        ]
+                                      },
+                                      "text": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "language",
+                                      "text"
+                                    ]
+                                  },
+                                  "praise": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "alternativeExpression": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "practiceTip": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "turnId",
+                                  "nodeId",
+                                  "attempt",
+                                  "npcText",
+                                  "learnerText",
+                                  "native",
+                                  "assessmentSource",
+                                  "legacyOutcome",
+                                  "evaluation",
+                                  "originalIntent",
+                                  "implicitIntent",
+                                  "cues",
+                                  "culturalContext",
+                                  "feedback",
+                                  "feedbackTranslation",
+                                  "praise",
+                                  "alternativeExpression",
+                                  "practiceTip"
+                                ]
+                              },
+                              "maxItems": 100
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "sessionId",
+                            "sceneId",
+                            "title",
+                            "language",
+                            "policyVersion",
+                            "provisional",
+                            "createdAt",
+                            "overview",
+                            "summary",
+                            "details"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "reportId",
+                        "status",
+                        "error",
+                        "report"
+                      ]
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string"
+                        },
+                        "apiVersion": {
+                          "type": "string",
+                          "enum": [
+                            "v1"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "requestId",
+                        "apiVersion"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "종합 평가와 대화별 문화 피드백 조회 — 조회 자체는 생성하지 않음",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "reportId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "queued",
+                            "running",
+                            "ready",
+                            "failed"
+                          ]
+                        },
+                        "error": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "properties": {
+                            "code": {
+                              "type": "string"
+                            },
+                            "message": {
+                              "type": "string"
+                            },
+                            "retryable": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "code",
+                            "message",
+                            "retryable"
+                          ]
+                        },
+                        "report": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "sessionId": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "sceneId": {
+                              "type": "string"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "language": {
+                              "type": "string",
+                              "enum": [
+                                "en",
+                                "ja",
+                                "zh",
+                                "vi",
+                                "es",
+                                "id",
+                                "ko"
+                              ]
+                            },
+                            "policyVersion": {
+                              "type": "string",
+                              "enum": [
+                                "report-v1-draft"
+                              ]
+                            },
+                            "provisional": {
+                              "type": "boolean",
+                              "enum": [
+                                true
+                              ]
+                            },
+                            "createdAt": {
+                              "type": "string"
+                            },
+                            "overview": {
+                              "type": "object",
+                              "properties": {
+                                "passed": {
+                                  "type": "boolean"
+                                },
+                                "score": {
+                                  "type": "number"
+                                },
+                                "grade": {
+                                  "type": "string"
+                                },
+                                "achievement": {
+                                  "type": [
+                                    "object",
+                                    "null"
+                                  ],
+                                  "properties": {
+                                    "reach": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 100
+                                    },
+                                    "infer": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 100
+                                    },
+                                    "self": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 100
+                                    }
+                                  },
+                                  "default": null,
+                                  "required": [
+                                    "reach",
+                                    "infer",
+                                    "self"
+                                  ]
+                                },
+                                "rewardCoins": {
+                                  "type": "number"
+                                },
+                                "elapsedMs": {
+                                  "type": "number"
+                                },
+                                "learnerTurns": {
+                                  "type": "number"
+                                },
+                                "judgmentCounts": {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "type": "number"
+                                  }
+                                }
+                              },
+                              "required": [
+                                "passed",
+                                "score",
+                                "grade",
+                                "rewardCoins",
+                                "elapsedMs",
+                                "learnerTurns",
+                                "judgmentCounts"
+                              ]
+                            },
+                            "summary": {
+                              "type": "object",
+                              "properties": {
+                                "headline": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 200
+                                },
+                                "overallFeedback": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 1200
+                                },
+                                "strengths": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "maxItems": 3
+                                },
+                                "improvements": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "maxItems": 3
+                                },
+                                "culturalTakeaways": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "minItems": 1,
+                                  "maxItems": 3
+                                },
+                                "nextPractice": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "minItems": 1,
+                                  "maxItems": 3
+                                }
+                              },
+                              "required": [
+                                "headline",
+                                "overallFeedback",
+                                "strengths",
+                                "improvements",
+                                "culturalTakeaways",
+                                "nextPractice"
+                              ]
+                            },
+                            "details": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "turnId": {
+                                    "type": "string"
+                                  },
+                                  "nodeId": {
+                                    "type": "string"
+                                  },
+                                  "attempt": {
+                                    "type": "number"
+                                  },
+                                  "comparison": {
+                                    "type": [
+                                      "object",
+                                      "null"
+                                    ],
+                                    "properties": {
+                                      "firstAnswer": {
+                                        "type": "string"
+                                      },
+                                      "currentAnswer": {
+                                        "type": "string"
+                                      },
+                                      "improved": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "default": null,
+                                    "required": [
+                                      "firstAnswer",
+                                      "currentAnswer",
+                                      "improved"
+                                    ]
+                                  },
+                                  "npcText": {
+                                    "type": "string"
+                                  },
+                                  "learnerText": {
+                                    "type": "string"
+                                  },
+                                  "native": {
+                                    "type": "boolean"
+                                  },
+                                  "assessmentSource": {
+                                    "type": "string",
+                                    "enum": [
+                                      "recorded",
+                                      "legacy"
+                                    ]
+                                  },
+                                  "legacyOutcome": {
+                                    "type": "string",
+                                    "enum": [
+                                      "correct",
+                                      "misunderstanding",
+                                      "clarify"
+                                    ]
+                                  },
+                                  "evaluation": {
+                                    "$ref": "#/components/schemas/ReactionEvaluation"
+                                  },
+                                  "originalIntent": {
+                                    "type": "string"
+                                  },
+                                  "implicitIntent": {
+                                    "type": "string"
+                                  },
+                                  "cues": {
+                                    "type": "array",
+                                    "items": {
+                                      "$ref": "#/components/schemas/NonverbalCue"
+                                    }
+                                  },
+                                  "culturalContext": {
+                                    "type": "string"
+                                  },
+                                  "feedback": {
+                                    "type": "string"
+                                  },
+                                  "feedbackTranslation": {
+                                    "type": [
+                                      "object",
+                                      "null"
+                                    ],
+                                    "properties": {
+                                      "language": {
+                                        "type": "string",
+                                        "enum": [
+                                          "en",
+                                          "ja",
+                                          "zh",
+                                          "vi",
+                                          "es",
+                                          "id",
+                                          "ko"
+                                        ]
+                                      },
+                                      "text": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "language",
+                                      "text"
+                                    ]
+                                  },
+                                  "praise": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "alternativeExpression": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "practiceTip": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "turnId",
+                                  "nodeId",
+                                  "attempt",
+                                  "npcText",
+                                  "learnerText",
+                                  "native",
+                                  "assessmentSource",
+                                  "legacyOutcome",
+                                  "evaluation",
+                                  "originalIntent",
+                                  "implicitIntent",
+                                  "cues",
+                                  "culturalContext",
+                                  "feedback",
+                                  "feedbackTranslation",
+                                  "praise",
+                                  "alternativeExpression",
+                                  "practiceTip"
+                                ]
+                              },
+                              "maxItems": 100
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "sessionId",
+                            "sceneId",
+                            "title",
+                            "language",
+                            "policyVersion",
+                            "provisional",
+                            "createdAt",
+                            "overview",
+                            "summary",
+                            "details"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "reportId",
+                        "status",
+                        "error",
+                        "report"
+                      ]
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string"
+                        },
+                        "apiVersion": {
+                          "type": "string",
+                          "enum": [
+                            "v1"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "requestId",
+                        "apiVersion"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{id}/report/retry": {
+      "post": {
+        "tags": [
+          "Reports"
+        ],
+        "summary": "실패한 상세 보고서만 다시 생성",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "성공",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "reportId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "queued",
+                            "running",
+                            "ready",
+                            "failed"
+                          ]
+                        },
+                        "error": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "properties": {
+                            "code": {
+                              "type": "string"
+                            },
+                            "message": {
+                              "type": "string"
+                            },
+                            "retryable": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "code",
+                            "message",
+                            "retryable"
+                          ]
+                        },
+                        "report": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "sessionId": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "sceneId": {
+                              "type": "string"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "language": {
+                              "type": "string",
+                              "enum": [
+                                "en",
+                                "ja",
+                                "zh",
+                                "vi",
+                                "es",
+                                "id",
+                                "ko"
+                              ]
+                            },
+                            "policyVersion": {
+                              "type": "string",
+                              "enum": [
+                                "report-v1-draft"
+                              ]
+                            },
+                            "provisional": {
+                              "type": "boolean",
+                              "enum": [
+                                true
+                              ]
+                            },
+                            "createdAt": {
+                              "type": "string"
+                            },
+                            "overview": {
+                              "type": "object",
+                              "properties": {
+                                "passed": {
+                                  "type": "boolean"
+                                },
+                                "score": {
+                                  "type": "number"
+                                },
+                                "grade": {
+                                  "type": "string"
+                                },
+                                "achievement": {
+                                  "type": [
+                                    "object",
+                                    "null"
+                                  ],
+                                  "properties": {
+                                    "reach": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 100
+                                    },
+                                    "infer": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 100
+                                    },
+                                    "self": {
+                                      "type": "number",
+                                      "minimum": 0,
+                                      "maximum": 100
+                                    }
+                                  },
+                                  "default": null,
+                                  "required": [
+                                    "reach",
+                                    "infer",
+                                    "self"
+                                  ]
+                                },
+                                "rewardCoins": {
+                                  "type": "number"
+                                },
+                                "elapsedMs": {
+                                  "type": "number"
+                                },
+                                "learnerTurns": {
+                                  "type": "number"
+                                },
+                                "judgmentCounts": {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "type": "number"
+                                  }
+                                }
+                              },
+                              "required": [
+                                "passed",
+                                "score",
+                                "grade",
+                                "rewardCoins",
+                                "elapsedMs",
+                                "learnerTurns",
+                                "judgmentCounts"
+                              ]
+                            },
+                            "summary": {
+                              "type": "object",
+                              "properties": {
+                                "headline": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 200
+                                },
+                                "overallFeedback": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 1200
+                                },
+                                "strengths": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "maxItems": 3
+                                },
+                                "improvements": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "maxItems": 3
+                                },
+                                "culturalTakeaways": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "minItems": 1,
+                                  "maxItems": 3
+                                },
+                                "nextPractice": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "minItems": 1,
+                                  "maxItems": 3
+                                }
+                              },
+                              "required": [
+                                "headline",
+                                "overallFeedback",
+                                "strengths",
+                                "improvements",
+                                "culturalTakeaways",
+                                "nextPractice"
+                              ]
+                            },
+                            "details": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "turnId": {
+                                    "type": "string"
+                                  },
+                                  "nodeId": {
+                                    "type": "string"
+                                  },
+                                  "attempt": {
+                                    "type": "number"
+                                  },
+                                  "comparison": {
+                                    "type": [
+                                      "object",
+                                      "null"
+                                    ],
+                                    "properties": {
+                                      "firstAnswer": {
+                                        "type": "string"
+                                      },
+                                      "currentAnswer": {
+                                        "type": "string"
+                                      },
+                                      "improved": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "default": null,
+                                    "required": [
+                                      "firstAnswer",
+                                      "currentAnswer",
+                                      "improved"
+                                    ]
+                                  },
+                                  "npcText": {
+                                    "type": "string"
+                                  },
+                                  "learnerText": {
+                                    "type": "string"
+                                  },
+                                  "native": {
+                                    "type": "boolean"
+                                  },
+                                  "assessmentSource": {
+                                    "type": "string",
+                                    "enum": [
+                                      "recorded",
+                                      "legacy"
+                                    ]
+                                  },
+                                  "legacyOutcome": {
+                                    "type": "string",
+                                    "enum": [
+                                      "correct",
+                                      "misunderstanding",
+                                      "clarify"
+                                    ]
+                                  },
+                                  "evaluation": {
+                                    "$ref": "#/components/schemas/ReactionEvaluation"
+                                  },
+                                  "originalIntent": {
+                                    "type": "string"
+                                  },
+                                  "implicitIntent": {
+                                    "type": "string"
+                                  },
+                                  "cues": {
+                                    "type": "array",
+                                    "items": {
+                                      "$ref": "#/components/schemas/NonverbalCue"
+                                    }
+                                  },
+                                  "culturalContext": {
+                                    "type": "string"
+                                  },
+                                  "feedback": {
+                                    "type": "string"
+                                  },
+                                  "feedbackTranslation": {
+                                    "type": [
+                                      "object",
+                                      "null"
+                                    ],
+                                    "properties": {
+                                      "language": {
+                                        "type": "string",
+                                        "enum": [
+                                          "en",
+                                          "ja",
+                                          "zh",
+                                          "vi",
+                                          "es",
+                                          "id",
+                                          "ko"
+                                        ]
+                                      },
+                                      "text": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "language",
+                                      "text"
+                                    ]
+                                  },
+                                  "praise": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "alternativeExpression": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "practiceTip": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "turnId",
+                                  "nodeId",
+                                  "attempt",
+                                  "npcText",
+                                  "learnerText",
+                                  "native",
+                                  "assessmentSource",
+                                  "legacyOutcome",
+                                  "evaluation",
+                                  "originalIntent",
+                                  "implicitIntent",
+                                  "cues",
+                                  "culturalContext",
+                                  "feedback",
+                                  "feedbackTranslation",
+                                  "praise",
+                                  "alternativeExpression",
+                                  "practiceTip"
+                                ]
+                              },
+                              "maxItems": 100
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "sessionId",
+                            "sceneId",
+                            "title",
+                            "language",
+                            "policyVersion",
+                            "provisional",
+                            "createdAt",
+                            "overview",
+                            "summary",
+                            "details"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "reportId",
+                        "status",
+                        "error",
+                        "report"
+                      ]
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string"
+                        },
+                        "apiVersion": {
+                          "type": "string",
+                          "enum": [
+                            "v1"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "requestId",
+                        "apiVersion"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ApiError — code와 retryable 참조",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/speech/transcriptions": {
       "post": {
         "tags": [
@@ -6857,6 +8546,20 @@
                               "type": "number",
                               "minimum": 0,
                               "maximum": 100
+                            },
+                            "evaluationMark": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "enum": [
+                                "O",
+                                "△",
+                                "X",
+                                "?",
+                                null
+                              ],
+                              "default": null
                             },
                             "reaction": {
                               "type": [

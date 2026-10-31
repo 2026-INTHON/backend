@@ -1,3 +1,5 @@
+import * as Reports from './reports';
+import {ReportResource} from './report-contracts';
 import * as CharacterImages from './character-images';
 import * as Content from './content';
 import * as Generation from './generation';
@@ -119,7 +121,7 @@ endpoint({ method: 'get', path: '/sessions/{id}/history', tag: 'Play', summary: 
 endpoint({ method: 'post', path: '/sessions/{id}/turns', tag: 'Play', summary: '텍스트·선택지·확인한 STT 답변 제출', params: idParam,
   description: 'clientTurnId를 재시도 시 그대로 사용. 동일 ID/내용은 같은 응답. 다른 내용은 409. 명확한 실수만 체력 -1; 애매한 답/AI 오류는 차감 없음. 텍스트·선택지는 속도/망설임 null.',
   input: z.object({ clientTurnId, inputType: z.enum(['text', 'choice', 'voice']), text: text.optional(), choiceId: z.string().optional(), transcriptId: z.string().uuid().optional(), realtime:z.boolean().default(false) }), output: C.TurnResult,
-  run: async(c,body,p)=>{limit(`${p!.id}:turns`,20);const result=await Game.submitTurn(p!.id,c.req.param('id')!,body);if(Game.getPlay(p!,c.req.param('id')!).subtitleLanguage&&result.session.aiMode==='live')return {...result,turn:{...result.turn,audioUrl:await voiceUrl(c,p!,result.turn.npcReply,result.session)}};return result;} });
+  run: async(c,body,p)=>{limit(`${p!.id}:turns`,20);let result=await Game.submitTurn(p!.id,c.req.param('id')!,body);if(result.result&&result.session.aiMode==='live'){const report=await Reports.ensure(p!.id,c.req.param('id')!).catch(()=>null);if(report)result={...result,result:{...result.result,report:{reportId:report.reportId,status:report.status}}};}if(Game.getPlay(p!,c.req.param('id')!).subtitleLanguage&&result.session.aiMode==='live')return {...result,turn:{...result.turn,audioUrl:await voiceUrl(c,p!,result.turn.npcReply,result.session)}};return result;} });
 endpoint({ method: 'post', path: '/sessions/{id}/hint', tag: 'Play', summary: '2단계 힌트 — 관찰 단서 → 가상 캐릭터의 속마음·표현 팁', params: idParam,
   description: 'step=1은 주목 표현·행동·상황 단서만 반환하며 hiddenThought/tip은 null. step=2는 속마음과 표현 팁을 추가 공개. 같은 노드·단계의 재조회는 hintsUsed를 중복 증가시키지 않음. 기존 클라이언트의 {} 요청은 step=2로 처리.',
   input: z.object({ step: z.union([z.literal(1), z.literal(2)]).default(2) }),
@@ -129,7 +131,7 @@ for (const action of ['pause', 'resume', 'abandon'] as const) endpoint({ method:
 endpoint({ method: 'post', path: '/sessions/{id}/retry', tag: 'Play', summary: '같은 장면을 새 세션으로 다시 하기', params: idParam, input: empty, output: C.Session,
   run: (c, _, p) => { const old = Game.getPlay(p!, c.req.param('id')!); return Game.createPlay(p!.id, old.sceneId, old.aiMode, old.scenario,undefined,old.subtitleLanguage); } });
 endpoint({ method: 'get', path: '/sessions/{id}/result', tag: 'Play', summary: '결과·잘한 말·아쉬운 말·지급된 재화', params: idParam, output: C.Result,
-  run: (c, _, p) => { const result = Game.getPlay(p!, c.req.param('id')!).result; if (!result) throw new ApiError('RESULT_NOT_READY', '장면을 마친 후 확인할 수 있어요.', 409); return result; } });
+  run: async(c, _, p) => { const play=Game.getPlay(p!,c.req.param('id')!);let result=play.result; if (!result) throw new ApiError('RESULT_NOT_READY', '장면을 마친 후 확인할 수 있어요.', 409); if(play.aiMode==='live'){const report=await Reports.read(p!.id,play.id).catch(()=>null);if(report)result={...result,report:{reportId:report.reportId,status:report.status}};}return result; } });
 endpoint({ method: 'post', path: '/sessions/{id}/speech', tag: 'Speech', summary: '현재 NPC 또는 지정한 반응 대사 TTS — 서명 URL 반환', params: idParam, input: z.object({turnId:z.string().uuid().optional()}), output: C.AudioAsset,
   run: async (c, body, p) => { limit(`${p!.id}:tts`, 20); const play = Game.getPlay(p!, c.req.param('id')!), s = Game.publicPlay(play);
     const turn=body.turnId?play.history.find(t=>t.id===body.turnId):null;if(body.turnId&&!turn)throw new ApiError('TURN_NOT_FOUND','대사를 찾지 못했어요.',404);
@@ -139,6 +141,9 @@ endpoint({ method: 'post', path: '/sessions/{id}/speech', tag: 'Speech', summary
 
 endpoint({method:'post',path:'/speech/realtime-session',tag:'Speech',summary:'녹음 중 실시간 전사용 60초 임시 자격증명',input:z.object({pack:C.Pack.default('ko')}),output:z.object({value:z.string(),expiresAt:z.number(),model:z.string(),sampleRate:z.number(),session:z.unknown(),websocketUrl:z.string()}),run:(c,b,p)=>{limit(p!.id+':realtime',2);return aiRequest('/v1/speech/realtime-session',{pack:b.pack,userId:p!.id});}});
 
+endpoint({method:'post',path:'/sessions/{id}/report',tag:'Reports',summary:'완료한 서브챕터의 상세 보고서 생성 예약·재조회',params:idParam,input:empty,output:ReportResource,run:(c,_,p)=>Reports.ensure(p!.id,c.req.param('id')!)});
+endpoint({method:'get',path:'/sessions/{id}/report',tag:'Reports',summary:'종합 평가와 대화별 문화 피드백 조회 — 조회 자체는 생성하지 않음',params:idParam,output:ReportResource,run:(c,_,p)=>Reports.read(p!.id,c.req.param('id')!)});
+endpoint({method:'post',path:'/sessions/{id}/report/retry',tag:'Reports',summary:'실패한 상세 보고서만 다시 생성',params:idParam,input:empty,output:ReportResource,run:(c,_,p)=>{limit(p!.id+':report-retry',3);return Reports.retry(p!.id,c.req.param('id')!);}});
 const uploadRoute = createRoute({ method: 'post', path: '/speech/transcriptions', tags: ['Speech'], summary: '녹음 → 수정 가능한 인식 결과 (제출/채점 전)', security: [{ BearerAuth: [] }],
   request: { body: { required: true, content: { 'multipart/form-data': { schema: z.object({ file: z.custom<File>(value => value instanceof File, '음성 파일이 필요해요.').openapi({ type: 'string', format: 'binary' }), pack: C.Pack.default('ko') }) } } } },
   responses: { 200: { description: '음성 인식 완료, text 수정 후 turns에 제출', content: { 'application/json': { schema: C.envelope(C.SpeechDraft) } } }, 422: { description: '인식 실패 — 체력 차감 없음', content: { 'application/json': { schema: C.ErrorBody } } } } });
