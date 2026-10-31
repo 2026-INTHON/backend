@@ -52,8 +52,8 @@ test('Clues, staged hints, language help, correction comparison and achievement 
   const history = (await request(`/sessions/${session.id}/history`, undefined, token)).data;
   assert.equal(history[2].comparison.firstAnswer, nativeInput.text);
   const chapters = (await request('/chapters?pack=ko&characterId=manager', undefined, token)).data;
-  assert.equal(chapters.length, 1); assert.equal(chapters[0].subs.length, 3);
-  assert.equal(chapters[0].subs.find((s: { sceneId: string }) => s.sceneId === session.sceneId).state, 'done');
+  assert.equal(chapters.length, 1); assert.equal(chapters[0].subs.length, 1);
+  assert.equal(chapters[0].subs[0].state, 'done'); // Personality variants share episode progress.
   assert.equal((await request('/chapters?pack=bogus', undefined, token)).status, 422);
 });
 

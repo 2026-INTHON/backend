@@ -97,3 +97,9 @@ Authorization: Bearer <기존 게스트의 앱 토큰>
 서버가 Google identity를 검증한 후 게스트 기록을 새/기존 회원에게 원자적으로 병합합니다. 응답의 새 앱 토큰으로 교체하세요. Supabase server secret, AI service token, OpenAI/Azure key를 FE나 `EXPO_PUBLIC_*`에 넣지 마세요.
 
 설정 참고: [Supabase Google 로그인](https://supabase.com/docs/guides/auth/social-sign-in/auth-google), [Expo OAuth 및 Expo Go 제약](https://docs.expo.dev/guides/authentication/).
+# 2026-11-01: 음성 조합 및 장면 재진입
+
+- Typecast 음성: 여자친구 playful=아린 / calm=나윤 / strict=예은, 교수 calm=재선 / strict=라연 / playful=승연(친절). 기존 personality ID를 유지한다.
+- AI의 캐시 버전이 `selected-voice-v2`로 바뀌어 기존 대사도 새 음성 URL을 받는다. FE는 반환된 audioUrl을 사용하고 만료 시 `/sessions/{id}/speech`로 다시 발급한다. 감정은 같은 목소리의 프리셋·강도를 조정한다.
+- `/chapters`의 `{pack}-{character}` 예시 CH 0는 성격 3종을 한 에피소드로 표시한다. `/sessions`에 선택한 personalityId를 보내면 해당 성격의 대본으로 시작한다. 기존 세 성격의 학습 기록은 모두 합산한다. 다른 커리큘럼·사용자 챕터는 제목으로 합치지 않는다.
+- 조회와 쓰기 요청 한도를 분리했다. 429는 `Retry-After` 헤더와 `error.details.retryAfter`(초)를 제공한다. FE는 요청을 중복 생성하거나 무제한 재시도하지 않는다.
