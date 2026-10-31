@@ -3,11 +3,12 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { Profile } from './models';
 import { ApiError } from './errors';
+import { chapterSql } from './chapter-sql';
 
 let localDb: DatabaseSync | undefined;
 let localPath = '';
 export function dataMode() { return process.env.MALO_DATA_MODE === 'supabase' ? 'supabase' : 'sqlite'; }
-function sqlite() {
+export function sqlite() {
   const path = process.env.MALO_DB_PATH || '.data/malo.sqlite';
   if (!localDb || path !== localPath) {
     localDb?.close();
@@ -15,6 +16,7 @@ function sqlite() {
     localDb = new DatabaseSync(path, { timeout: 5000 });
     localPath = path;
     localDb.exec('PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS malo_profiles (id TEXT PRIMARY KEY, version INTEGER NOT NULL, document TEXT NOT NULL)');
+    localDb.exec(chapterSql);
   }
   return localDb;
 }
@@ -23,7 +25,7 @@ function restHeaders() {
   if (!process.env.SUPABASE_URL || !key) throw new ApiError('DATABASE_NOT_CONFIGURED', 'Supabase 서버 설정이 필요합니다.', 503, true);
   return { apikey: key, ...(key.startsWith('eyJ') ? { Authorization: `Bearer ${key}` } : {}), 'Content-Type': 'application/json', Prefer: 'return=representation' };
 }
-async function rest(path: string, init: RequestInit = {}) {
+export async function rest(path: string, init: RequestInit = {}) {
   try {
     const response = await fetch(`${process.env.SUPABASE_URL}/rest/v1/${path}`, { ...init, headers: { ...restHeaders(), ...init.headers }, signal: AbortSignal.timeout(12000) });
     if (!response.ok) throw new ApiError('DATABASE_UNAVAILABLE', '데이터 저장소에 연결하지 못했어요.', 503, true);
@@ -112,6 +114,7 @@ export async function mergeProfiles(guestId: string, targetId: string): Promise<
         guest.state.refreshTokens = [];
         db.prepare('UPDATE malo_profiles SET version=?,document=? WHERE id=?').run(target.version + 1, JSON.stringify(document(merged)), targetId);
         db.prepare('UPDATE malo_profiles SET version=?,document=? WHERE id=?').run(guest.version + 1, JSON.stringify(document(guest)), guestId);
+        for (const table of ['malo_generation_jobs', 'malo_user_chapters', 'malo_push_subscriptions']) db.prepare(`UPDATE ${table} SET owner_id=? WHERE owner_id=?`).run(targetId, guestId);
         db.exec('COMMIT');
       } catch (error) { db.exec('ROLLBACK'); throw error; }
     }

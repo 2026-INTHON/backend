@@ -1,3 +1,9 @@
+import * as Content from './content';
+import * as Generation from './generation';
+import * as Push from './push';
+import { ChapterInput, JobView } from './generation-contracts';
+import { timingSafeEqual } from 'node:crypto';
+import {readFile} from 'node:fs/promises';
 import { OpenAPIHono, createRoute } from '@hono/zod-openapi';
 import { swaggerUI } from '@hono/swagger-ui';
 import { cors } from 'hono/cors';
@@ -70,7 +76,7 @@ endpoint({ method: 'get', path: '/health', tag: 'System', summary: '서버 상�
   output: z.object({ status: z.literal('ok'), service: z.literal('malo-backend'), version: z.string(), storage: z.string(), defaultAiMode: z.string(), googleEnabled: z.boolean(), demoAuthEnabled: z.boolean(), aiConfigured: z.boolean() }),
   run: () => ({ status: 'ok', service: 'malo-backend', version: '0.1.0', storage: dataMode(), defaultAiMode: 'mock', googleEnabled: process.env.MALO_GOOGLE_ENABLED === 'true', demoAuthEnabled: process.env.MALO_ALLOW_DEMO_AUTH === 'true', aiConfigured: !!process.env.MALO_AI_URL }) });
 endpoint({ method: 'get', path: '/auth/config', tag: 'Auth', summary: 'Google OAuth 준비 상태와 앱용 공개 설정', auth: false,
-  output: z.object({ guestEnabled: z.boolean(), google: z.object({ enabled: z.boolean(), supabaseUrl: z.string().nullable(), publishableKey: z.string().nullable(), flow: z.string() }), demoUpgradeEnabled: z.boolean() }), run: () => Auth.authConfig() });
+  output: z.object({ guestEnabled: z.boolean(), google: z.object({ enabled: z.boolean(), supabaseUrl: z.string().nullable(), publishableKey: z.string().nullable(), flow: z.string() }), demoUpgradeEnabled: z.boolean(),supabaseUrl:z.string().nullable(),publishableKey:z.string().nullable() }), run: () => {const cfg=Auth.authConfig();return {...cfg,supabaseUrl:cfg.google.supabaseUrl,publishableKey:cfg.google.publishableKey};} });
 endpoint({ method: 'post', path: '/auth/guest', tag: 'Auth', summary: '기록이 저장되는 게스트 계정 생성', auth: false,
   input: z.object({ displayName: z.string().trim().min(1).max(40).default('게스트') }), output: C.Auth, run: (_, body) => Auth.createGuest(body.displayName) });
 endpoint({ method: 'post', path: '/auth/refresh', tag: 'Auth', summary: 'Refresh token 1회 사용 후 회전', auth: false,
@@ -87,15 +93,15 @@ endpoint({ method: 'post', path: '/auth/google/exchange', tag: 'Auth', summary: 
 endpoint({ method: 'get', path: '/me', tag: 'Home', summary: '내 계정', output: C.User, run: (_, __, p) => Auth.publicUser(p!) });
 endpoint({ method: 'get', path: '/home', tag: 'Home', summary: '이어하기·오늘의 장면·재화·출석 팝업', output: C.Home, run: (_, __, p) => Game.home(p!) });
 endpoint({ method: 'get', path: '/packs', tag: 'Catalog', summary: '한국어/영어팩', auth: false, output: z.array(feature), run: () => packs });
-endpoint({ method: 'get', path: '/characters', tag: 'Catalog', summary: '4명 캐릭터와 각 3가지 성격', auth: false, output: z.array(C.Character), run: () => characters });
+endpoint({ method: 'get', path: '/characters', tag: 'Catalog', summary: '4명 캐릭터와 각 3가지 성격', auth: false, output: z.array(C.Character), run: () => Content.characters() });
 endpoint({ method: 'get', path: '/chapters', tag: 'Catalog', summary: '캐릭터별 챕터·성격별 서브 챕터와 내 진행 상태',
   query: z.object({ pack: C.Pack.optional(), characterId: z.string().optional() }), output: z.array(C.Chapter),
   run: (c, _, p) => Game.chapters(p!, (c.req.query('pack') || p!.state.settings.pack) as 'ko' | 'en', c.req.query('characterId')) });
 endpoint({ method: 'get', path: '/scenes', tag: 'Catalog', summary: '팩·캐릭터·성격별 장면 목록', auth: false,
   query: z.object({ pack: C.Pack.optional(), characterId: z.string().optional(), personalityId: z.string().optional() }), output: z.array(C.Scene),
-  run: c => listScenes((c.req.query('pack') || 'ko') as 'ko' | 'en', c.req.query('characterId'), c.req.query('personalityId')) });
+  run: c => Content.scenes((c.req.query('pack') || 'ko') as 'ko' | 'en', c.req.query('characterId'), c.req.query('personalityId')) });
 endpoint({ method: 'get', path: '/scenes/{sceneId}', tag: 'Catalog', summary: '장면 브리핑', auth: false,
-  params: z.object({ sceneId: z.string() }), output: C.Scene, run: c => { const s = findScenario(c.req.param('sceneId')!); if (!s) throw new ApiError('SCENE_NOT_FOUND', '장면을 찾지 못했어요.', 404); return { ...s, id: c.req.param('sceneId')!, nodeCount: s.nodes.length, estimatedMinutes: 3 }; } });
+  params: z.object({ sceneId: z.string() }), output: C.Scene, run: async c => { const s = await Content.scene(c.req.param('sceneId')!); if (!s) throw new ApiError('SCENE_NOT_FOUND', '장면을 찾지 못했어요.', 404); return { ...s, id: c.req.param('sceneId')!, nodeCount: s.nodes.length, estimatedMinutes: s.estimatedMinutes||3 }; } });
 endpoint({ method: 'get', path: '/settings', tag: 'Settings', summary: '설정 조회', output: C.Settings, run: (_, __, p) => p!.state.settings });
 endpoint({ method: 'patch', path: '/settings', tag: 'Settings', summary: '팩·음성 속도·자막·알림 설정 저장', input: C.Settings.partial(), output: C.Settings,
   run: async (_, body, p) => (await mutate(p!.id, user => { user.state.settings = { ...user.state.settings, ...body }; return user.state.settings; })).value });
@@ -105,7 +111,7 @@ endpoint({ method: 'get', path: '/sessions/{id}', tag: 'Play', summary: '장면 
 endpoint({ method: 'get', path: '/sessions/{id}/history', tag: 'Play', summary: '대화 내역', params: idParam, output: z.array(C.Turn), run: (c, _, p) => Game.getPlay(p!, c.req.param('id')!).history });
 endpoint({ method: 'post', path: '/sessions/{id}/turns', tag: 'Play', summary: '텍스트·선택지·확인한 STT 답변 제출', params: idParam,
   description: 'clientTurnId를 재시도 시 그대로 사용. 동일 ID/내용은 같은 응답. 다른 내용은 409. 명확한 실수만 체력 -1; 애매한 답/AI 오류는 차감 없음. 텍스트·선택지는 속도/망설임 null.',
-  input: z.object({ clientTurnId, inputType: z.enum(['text', 'choice', 'voice']), text: text.optional(), choiceId: z.string().optional(), transcriptId: z.string().uuid().optional() }), output: C.TurnResult,
+  input: z.object({ clientTurnId, inputType: z.enum(['text', 'choice', 'voice']), text: text.optional(), choiceId: z.string().optional(), transcriptId: z.string().uuid().optional(), realtime:z.boolean().default(false) }), output: C.TurnResult,
   run: (c, body, p) => { limit(`${p!.id}:turns`, 20); return Game.submitTurn(p!.id, c.req.param('id')!, body); } });
 endpoint({ method: 'post', path: '/sessions/{id}/hint', tag: 'Play', summary: '2단계 힌트 — 관찰 단서 → 가상 캐릭터의 속마음·표현 팁', params: idParam,
   description: 'step=1은 주목 표현·행동·상황 단서만 반환하며 hiddenThought/tip은 null. step=2는 속마음과 표현 팁을 추가 공개. 같은 노드·단계의 재조회는 hintsUsed를 중복 증가시키지 않음. 기존 클라이언트의 {} 요청은 step=2로 처리.',
@@ -122,6 +128,8 @@ endpoint({ method: 'post', path: '/sessions/{id}/speech', tag: 'Speech', summary
     const result = await aiRequest('/v1/speech/synthesize', { text: s.npc.text, pack: s.pack, characterId: s.characterId, emotion: s.npc.emotion, speed: p!.state.settings.voiceSpeed });
     const token = await Auth.signAudio(p!.id, result.assetId); const base = process.env.MALO_PUBLIC_BASE_URL || new URL(c.req.url).origin;
     return { ...result, mimeType: 'audio/mpeg' as const, expiresIn: 600, audioUrl: `${base}/api/v1/audio/${result.assetId}?token=${encodeURIComponent(token)}` }; } });
+
+endpoint({method:'post',path:'/speech/realtime-session',tag:'Speech',summary:'녹음 중 실시간 전사용 60초 임시 자격증명',input:z.object({pack:C.Pack.default('ko')}),output:z.object({value:z.string(),expiresAt:z.number(),model:z.string(),sampleRate:z.number(),session:z.unknown(),websocketUrl:z.string()}),run:(c,b,p)=>{limit(p!.id+':realtime',2);return aiRequest('/v1/speech/realtime-session',{pack:b.pack,userId:p!.id});}});
 
 const uploadRoute = createRoute({ method: 'post', path: '/speech/transcriptions', tags: ['Speech'], summary: '녹음 → 수정 가능한 인식 결과 (제출/채점 전)', security: [{ BearerAuth: [] }],
   request: { body: { required: true, content: { 'multipart/form-data': { schema: z.object({ file: z.custom<File>(value => value instanceof File, '음성 파일이 필요해요.').openapi({ type: 'string', format: 'binary' }), pack: C.Pack.default('ko') }) } } } },
@@ -147,7 +155,7 @@ endpoint({ method: 'get', path: '/wallet/transactions', tag: 'Preview', summary:
 endpoint({ method: 'get', path: '/shop', tag: 'Preview', summary: '[화면용] 외모 상점 — 결제 없음', output: preview,
   run: () => ({ previewOnly: true, realBilling: false, items: [{ id: 'outfit-casual', name: '편안한 주말 옷', description: '외모 변경 화면용 아이템', priceCoins: 150, assetKey: 'shop/outfit-casual' }, { id: 'hair-short', name: '산뜻한 헤어', description: '외모 변경 화면용 아이템', priceCoins: 100, assetKey: 'shop/hair-short' }] }) });
 endpoint({ method: 'get', path: '/personality-customizations', tag: 'Preview', summary: '[화면용] 성격 커스텀', output: preview,
-  run: () => ({ previewOnly: true, realBilling: false, items: characters[0].personalities.map(p => ({ id: p.id, name: p.name, description: p.description, priceCoins: 100, assetKey: p.assetKey })) }) });
+  run: async () => ({ previewOnly: true, realBilling: false, items: (await Content.characters())[0].personalities.map(p => ({ id: p.id, name: p.name, description: p.description, priceCoins: 100, assetKey: p.assetKey })) }) });
 endpoint({ method: 'get', path: '/plans', tag: 'Preview', summary: '[화면용] 구독 혜택 — 실제 가격·결제 없음', output: preview,
   run: () => ({ previewOnly: true, realBilling: false, items: [{ id: 'free', name: '기본 연습', description: '준비된 캐릭터와 장면으로 연습', priceCoins: null, assetKey: null }, { id: 'plus-preview', name: 'Malo Plus 미리보기', description: '나만의 에피소드 만들기 — 해커톤에서는 기능 시연만 제공', priceCoins: null, assetKey: null }] }) });
 endpoint({ method: 'get', path: '/assets/personas', tag: 'Catalog', summary: 'OpenAI로 생성·저장된 캐릭터 이미지 — 조회는 과금 없음', auth: false,
@@ -160,8 +168,18 @@ app.get('/images/:assetId', async c => {
   c.header('Content-Type', 'image/webp'); c.header('Cache-Control', 'public, max-age=31536000, immutable');
   return c.body(bytes);
 });
+app.get('/catalog-assets/:filename',async c=>{const name=c.req.param('filename');if(!/^(char|card|bg)-[a-z]+\.png$/.test(name))throw new ApiError('IMAGE_NOT_FOUND','이미지를 찾지 못했어요.',404);try{const content=await readFile('public/assets/catalog/'+name);c.header('Content-Type','image/png');c.header('Cache-Control','public, max-age=3600');return c.body(content);}catch{throw new ApiError('IMAGE_NOT_FOUND','이미지를 찾지 못했어요.',404);}});
 app.openAPIRegistry.registerPath({ method: 'get', path: '/images/{assetId}', tags: ['Catalog'], summary: '공유 캐릭터 WebP 이미지 — 영구 캐시 가능한 콘텐츠 해시 URL', request: { params: z.object({ assetId: z.string().regex(/^i_[a-f0-9]{40}$/) }) }, responses: { 200: { description: 'WebP, no generation API call', content: { 'image/webp': { schema: { type: 'string', format: 'binary' } } } } } });
 
+endpoint({method:'post',path:'/chapter-generations',tag:'Generation',summary:'나만의 챕터 생성 예약 — 즉시 반환, 서버에서 계속 생성',input:ChapterInput,output:JobView,run:(_,body,p)=>Generation.create(p!.id,body)});
+endpoint({method:'get',path:'/chapter-generations',tag:'Generation',summary:'내 생성 작업 목록',output:z.array(JobView),run:(_,__,p)=>Generation.jobs(p!.id)});
+endpoint({method:'get',path:'/chapter-generations/{id}',tag:'Generation',summary:'내 생성 상태 — 완료 시 chapterId',params:idParam,output:JobView,run:(c,_,p)=>Generation.job(p!.id,c.req.param('id')!)});
+endpoint({method:'post',path:'/chapter-generations/{id}/retry',tag:'Generation',summary:'실패한 생성을 저장한 단계부터 재시도',params:idParam,input:empty,output:JobView,run:(c,_,p)=>{limit(p!.id+':generation-retry',3);return Generation.retry(p!.id,c.req.param('id')!);}});
+endpoint({method:'get',path:'/notifications/push/config',tag:'Notifications',summary:'웹 푸시 공개 설정',output:z.object({enabled:z.boolean(),publicKey:z.string().nullable()}),run:()=>Push.pushConfig()});
+endpoint({method:'post',path:'/notifications/push/subscriptions',tag:'Notifications',summary:'알림 허용 후 브라우저 구독 저장',input:z.object({endpoint:z.string().url().max(4096),keys:z.object({p256dh:z.string().min(20).max(200),auth:z.string().min(10).max(100)})}),output:z.object({id:z.string()}),run:(_,b,p)=>Push.subscribe(p!.id,b)});
+endpoint({method:'delete',path:'/notifications/push/subscriptions/{subscriptionId}',tag:'Notifications',summary:'내 브라우저 알림 구독 해제',params:z.object({subscriptionId:z.string().regex(/^[a-f0-9]{64}$/)}),output:z.object({removed:z.literal(true)}),run:async(c,_,p)=>{await Push.unsubscribe(c.req.param('subscriptionId')!,p!.id);return {removed:true};}});
+// Internal VM worker only; the same existing service credential is never exposed to FE.
+app.post('/internal/generation-worker',async c=>{const expected=process.env.MALO_AI_SERVICE_TOKEN||'',provided=c.req.header('X-AI-Service-Token')||'';if(!expected||Buffer.byteLength(expected)!==Buffer.byteLength(provided)||!timingSafeEqual(Buffer.from(expected),Buffer.from(provided)))throw new ApiError('UNAUTHORIZED','인증이 필요해요.',401);await Push.retryNotifications();return c.json(await Generation.workOne());});
 export const documentConfig = { openapi: '3.1.0' as const, info: { title: 'Malo Backend API', version: '0.1.0', description: 'React Native + Expo FE용 API. 기본 Mock 채점, 선택 시 Live AI. Guest 영속 저장 및 Google 회원 이관. 상점/구독은 화면용 데이터만 제공합니다.' }, servers: [{ url: '/', description: '현재 서버' }], security: [] };
 app.doc31('/openapi.json', documentConfig);
 app.get('/docs', swaggerUI({ url: '/api/v1/openapi.json', persistAuthorization: false }));

@@ -1,0 +1,11 @@
+[Unit]
+Description=Process queued Malo generation without an open app
+
+[Timer]
+OnBootSec=30
+OnUnitInactiveSec=5
+AccuracySec=1
+Unit=malo-generation.service
+
+[Install]
+WantedBy=timers.target
