@@ -21,10 +21,10 @@ type ExportJob=Omit<Job,'request'|'checkpoint'>&{request:Request;checkpoint:{pay
 const now=()=>new Date().toISOString();
 const view=(j:ExportJob)=>ExportView.parse({id:j.id,format:j.request.exportFormat,language:j.request.language,status:j.status,stage:j.stage,error:j.error,bytes:j.checkpoint.file?.bytes??null,durationSeconds:j.checkpoint.file?.durationSeconds??null});
 const copy={
- ko:{me:'나',score:'점수',reach:'달성률',infer:'추론',self:'자립 표현',strengths:'잘한 점',improvements:'개선할 점',shortcomings:'아쉬운 점',culture:'문화 팁',details:'대화',partner:'상대',intent:'상대의 의도',example:'추천 표현',review:'대화 다시 보기'},
- en:{me:'You',score:'Score',reach:'Goals',infer:'Inference',self:'Independent expression',strengths:'What went well',improvements:'How to improve',shortcomings:'What was missing',culture:'Culture tips',details:'Exchange',partner:'Partner',intent:'Intended meaning',example:'Suggested expression',review:'Conversation replay'},
- ja:{me:'あなた',score:'スコア',reach:'達成率',infer:'意図の理解',self:'自分の言葉で表現',strengths:'よかった点',improvements:'改善のヒント',shortcomings:'惜しかった点',culture:'文化のヒント',details:'会話',partner:'相手',intent:'相手の意図',example:'表現例',review:'会話の振り返り'},
- zh:{me:'你',score:'得分',reach:'目标完成率',infer:'理解意图',self:'自主表达',strengths:'做得好的地方',improvements:'改进建议',shortcomings:'不足之处',culture:'文化提示',details:'对话',partner:'对方',intent:'对方的意图',example:'推荐表达',review:'对话回顾'},
+ ko:{me:'나',score:'점수',reach:'의도 전달',infer:'힌트 없이 답하기',self:'표현 도움 없이 답하기',strengths:'잘한 점',improvements:'개선할 점',shortcomings:'아쉬운 점',culture:'문화 팁',details:'대화',partner:'상대',intent:'상대의 의도',example:'추천 표현',review:'대화 다시 보기',empty:'추가로 짚을 내용이 없어요.'},
+ en:{me:'You',score:'Score',reach:'Intent conveyed',infer:'Without hints',self:'Without expression help',strengths:'What went well',improvements:'How to improve',shortcomings:'What was missing',culture:'Culture tips',details:'Exchange',partner:'Partner',intent:'Intended meaning',example:'Suggested expression',review:'Conversation replay',empty:'Nothing to add here.'},
+ ja:{me:'あなた',score:'スコア',reach:'意図の伝達',infer:'ヒントなしで返答',self:'表現の補助なしで返答',strengths:'よかった点',improvements:'改善のヒント',shortcomings:'惜しかった点',culture:'文化のヒント',details:'会話',partner:'相手',intent:'相手の意図',example:'表現例',review:'会話の振り返り',empty:'追加のコメントはありません。'},
+ zh:{me:'你',score:'得分',reach:'意图传达',infer:'不使用提示回答',self:'不借助表达帮助回答',strengths:'做得好的地方',improvements:'改进建议',shortcomings:'不足之处',culture:'文化提示',details:'对话',partner:'对方',intent:'对方的意图',example:'推荐表达',review:'对话回顾',empty:'暂无其他补充。'},
 };
 async function owned(owner:string,sessionId:string){const profile=await readProfile(owner);if(!profile)throw new ApiError('SESSION_NOT_FOUND','대화를 찾지 못했어요.',404);const play=getPlay(profile,sessionId);if(!play.result||!['succeeded','failed'].includes(play.status))throw new ApiError('EXPORT_NOT_READY','대화가 끝난 뒤 내보낼 수 있어요.',409);return {profile,play};}
 export async function list(owner:string,sessionId:string,language:string){await owned(owner,sessionId);return (await rows<ExportJob>('malo_generation_jobs',{owner_id:owner,kind:'report'})).filter(j=>j.request.sessionId===sessionId&&j.request.exportFormat&&j.request.language===language).map(view);}
@@ -47,13 +47,13 @@ async function payload(j:ExportJob,play:Play,speed:number):Promise<Payload>{
  const sameLanguage=play.subtitleLanguage===lang;
  let title=lang==='ko'?play.scenario.title:sameLanguage?play.subtitles?.[play.scenario.title]||'':'';
  const result=play.result!,score=`${c.score} ${result.score}/100`,a=result.achievement;
- const summary=[score,...(a?[`${c.reach} ${a.reach}% · ${c.infer} ${a.infer}% · ${c.self} ${a.self}%`]:[])];
+ const summary=[score,...(a?[`${c.reach} ${a.reach}%`,`${c.infer} ${a.infer}%`,`${c.self} ${a.self}%`]:[])];
  const frames:Frame[]=[],sections:Payload['sections']=[];
  if(j.request.exportFormat==='pdf'){
   const r=play.detailedReports?.[lang];if(!r)throw new ApiError('REPORT_NOT_READY','상세 보고서를 먼저 완성해 주세요.',409,true);
   sections.push({title:r.summary.headline,lines:[...summary,r.summary.overallFeedback]});
-  for(const key of ['strengths','improvements','shortcomings'] as const)sections.push({title:c[key],lines:r.summary[key]||[]});
-  sections.push({title:c.culture,lines:r.summary.culturalTakeaways});
+  for(const key of ['strengths','improvements','shortcomings'] as const)sections.push({title:c[key],lines:r.summary[key]?.length?r.summary[key]:[c.empty]});
+  sections.push({title:c.culture,lines:r.summary.culturalTakeaways.length?r.summary.culturalTakeaways:[c.empty]});
   r.details.forEach((d,i)=>{
    sections.push({title:`${c.details} ${i+1} · ${d.evaluation?.mark||''}`,lines:[`${c.partner}: ${d.npcText}`,`${c.me}: ${d.learnerText}`,lang==='ko'?d.feedback:d.evaluation?.reasonSubtitle?.language===lang?d.evaluation.reasonSubtitle.text:d.feedbackTranslation?.language===lang?d.feedbackTranslation.text:''].filter(Boolean)});
    sections.push({title:c.intent,lines:[d.implicitIntent]});
@@ -83,7 +83,9 @@ async function payload(j:ExportJob,play:Play,speed:number):Promise<Payload>{
   const tr=await translations([...(title?[]:[play.scenario.title]),...missing.map(f=>f.text)],lang);
   title ||= tr[play.scenario.title];for(const f of missing)f.subtitle=tr[f.text]||'';
  }else for(const f of frames)if(f.speaker==='npc')f.subtitle='';
- return {exportId:j.id,format:j.request.exportFormat,title,subtitle:c.review,backgroundUrl:play.scenario.backgroundUrl||null,frames,sections};
+ // Match the app's default scene background for sessions created before catalog backgrounds.
+ const place=play.scenario.characterId==='girlfriend'?'cafe':play.scenario.characterId==='manager'?'office':'street';
+ return {exportId:j.id,format:j.request.exportFormat,title,subtitle:c.review,backgroundUrl:play.scenario.backgroundUrl||`/api/v1/catalog-assets/bg-${place}.png`,frames,sections};
 }
 export async function processExport(raw:Job,worker:string){
  const j=raw as unknown as ExportJob;
