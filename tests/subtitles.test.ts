@@ -8,7 +8,7 @@ test('Selected subtitle language and persona reach AI; each audio asset matches 
  const spoken:string[]=[];
  globalThis.fetch=async(url,init)=>{const input=JSON.parse(init!.body as string);if(String(url).endsWith('/subtitles')){assert.equal(input.language,'en');return Response.json({texts:input.texts.map((_:string,i:number)=>'Subtitle '+i)});}
   if(String(url).endsWith('/synthesize')){spoken.push(input.text);return Response.json({assetId:'a_'+'a'.repeat(40),cached:true,voice:'test'});}
-  if(String(url).endsWith('/evaluate')){assert.equal(input.personalityId,'strict');assert.equal(input.subtitleLanguage,'en');return Response.json({outcome:'correct',confidence:.99,toneScore:94,toneLabel:'정중해요',native:false,feedback:'좋아요.',betterExpression:'감사합니다.',reason:'의도를 전했어요.',npcReply:'내일 오후까지 제출해 주세요.',npcReplySubtitle:'Please submit it by tomorrow afternoon.',evaluationMark:'O',emotion:'sad',action:'고개를 끄덕인다.',cues:[{k:'표정',v:'차분하다.'}],views:[{who:'교수님',meaning:'감사합니다.',cue:'정중히'},{who:'친구',meaning:'고마워.',cue:'편하게'}],provider:'test-live',isMock:false});}
+  if(String(url).endsWith('/evaluate')){assert.equal(input.personalityId,'strict');assert.equal(input.subtitleLanguage,'en');return Response.json({outcome:'correct',confidence:.99,toneScore:94,toneLabel:'정중해요',native:true,feedback:'좋아요.',betterExpression:'감사합니다.',reason:'의도를 전했어요.',npcReply:'내일 오후까지 제출해 주세요.',npcReplySubtitle:'Please submit it by tomorrow afternoon.',evaluationMark:'O',emotion:'sad',action:'고개를 끄덕인다.',cues:[{k:'표정',v:'차분하다.'}],views:[{who:'교수님',meaning:'감사합니다.',cue:'정중히'},{who:'친구',meaning:'고마워.',cue:'편하게'}],provider:'test-live',isMock:false});}
   throw new Error('Unexpected request');
  };
  try{
@@ -20,3 +20,4 @@ test('Selected subtitle language and persona reach AI; each audio asset matches 
   const badLang=await request('/sessions',{sceneId:'ko-professor-calm',subtitleLanguage:'not-a-language'},token);assert.equal(badLang.status,422);
  }finally{globalThis.fetch=real;}
 });
+

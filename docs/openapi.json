@@ -8547,6 +8547,13 @@
                               "minimum": 0,
                               "maximum": 100
                             },
+                            "imageAssetKey": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "default": null
+                            },
                             "evaluationMark": {
                               "type": [
                                 "string",
@@ -10074,6 +10081,30 @@
                                   "string",
                                   "null"
                                 ]
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "reaction": {
+                                "type": "string"
+                              },
+                              "pose": {
+                                "type": "string"
+                              },
+                              "useWhen": {
+                                "type": "string"
+                              },
+                              "tags": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "defaultForEmotion": {
+                                "type": "boolean"
+                              },
+                              "source": {
+                                "type": "string"
                               }
                             },
                             "required": [

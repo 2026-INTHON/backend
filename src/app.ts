@@ -66,8 +66,8 @@ function endpoint<I extends C.z.ZodType = C.z.ZodObject, O extends C.z.ZodType =
     let value=await e.run(c,body,p);
     const base=(process.env.MALO_PUBLIC_BASE_URL||new URL(c.req.url).origin).replace(/\/$/,'');
     const outputSchema:unknown=e.output;
-    if(outputSchema===C.Session){const session=value as C.SessionValue;session.npc.render=await CharacterImages.render(base,session.characterId,session.npc.emotion,session.npc.gesture||'idle');session.npc.assetKey=session.npc.render.assetKey;}
-    if(outputSchema===C.TurnResult){const result=value as C.z.infer<typeof C.TurnResult>;result.session.npc.render=await CharacterImages.render(base,result.session.characterId,result.session.npc.emotion,result.session.npc.gesture||'idle');result.session.npc.assetKey=result.session.npc.render.assetKey;result.turn.render=await CharacterImages.render(base,result.session.characterId,result.turn.emotion,result.turn.gesture||'idle');result.oopsMoment.assetKey=result.turn.render.assetKey;}
+    if(outputSchema===C.Session){const session=value as C.SessionValue;session.npc.render=await CharacterImages.render(base,session.characterId,session.npc.emotion,session.npc.gesture||'idle',session.npc.assetKey);session.npc.assetKey=session.npc.render.assetKey;}
+    if(outputSchema===C.TurnResult){const result=value as C.z.infer<typeof C.TurnResult>;result.session.npc.render=await CharacterImages.render(base,result.session.characterId,result.session.npc.emotion,result.session.npc.gesture||'idle',result.session.npc.assetKey);result.session.npc.assetKey=result.session.npc.render.assetKey;result.turn.render=await CharacterImages.render(base,result.session.characterId,result.turn.emotion,result.turn.gesture||'idle',result.turn.render?.assetKey);result.oopsMoment.assetKey=result.turn.render.assetKey;}
     const data=e.output.parse(value);
     return c.json({ data, meta: { requestId: c.get('requestId'), apiVersion: 'v1' as const } }, 200) as never;
   });
