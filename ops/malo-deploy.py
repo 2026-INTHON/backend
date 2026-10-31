@@ -21,7 +21,7 @@ def run(*args):
     subprocess.run(args, check=True, cwd=BASE)
 
 def latest(service):
-    request = urllib.request.Request(f'https://github.com/2026-INTHON/{service}/releases/latest', headers={'User-Agent': 'Malo-Deploy/1.0'})
+    request = urllib.request.Request(f'https://github.com/2026-INTHON/{service}/releases/latest?malo_poll={int(time.time())}', headers={'User-Agent': 'Malo-Deploy/1.0', 'Cache-Control': 'no-cache'})
     with urllib.request.urlopen(request, timeout=30) as response:
         tag = response.url.rsplit('/', 1)[-1]
     if not re.fullmatch(r'deploy-[a-f0-9]{40}', tag):
