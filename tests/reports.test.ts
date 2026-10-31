@@ -10,7 +10,7 @@ test('Report creation is idempotent, survives owner migration and praises good a
  let reports=0;
  globalThis.fetch=async(url,init)=>{const path=String(url),input=init?.body?JSON.parse(init.body as string):{};
   if(path.endsWith('/evaluate'))return Response.json({reaction:'happy',goalAchieved:true,outcome:'correct',confidence:.99,native:false,toneScore:95,toneLabel:'정중해요',feedback:'이유와 일정을 명확하게 전했어요.',betterExpression:input.node.goodExample,reason:'검토할 시간을 배려했어요.',reasonSubtitle:'You considered review time.',npcReply:'네, 확인했습니다.',npcReplySubtitle:'All right, noted.',emotion:'happy',gesture:'nod',action:'고개를 끄덕인다.',cues:[{k:'표정',v:'미소를 짓는다.'}],views:input.node.views,provider:'test',isMock:false});
-  if(path.endsWith('/reports/generate')){reports++;return Response.json({report:{language:input.language,headline:'Clear and considerate',overallFeedback:'You made a clear request.',strengths:['You gave a deadline.'],improvements:[],culturalTakeaways:['Honorifics fit this relationship.'],nextPractice:['Try another polite request.'],nodes:input.nodes.map((n:{nodeId:string})=>({nodeId:n.nodeId,implicitIntent:'The professor needs a specific time.',culturalContext:'A polite question can give the other person room to answer. Preferences vary.',practiceTip:'Keep the timeline specific.'}))}});}
+  if(path.endsWith('/reports/generate')){reports++;return Response.json({report:{language:input.language,headline:'Clear and considerate',overallFeedback:'You made a clear request.',strengths:['You gave a deadline.'],improvements:[],culturalTakeaways:['Honorifics fit this relationship.'],nextPractice:['Try another polite request.'],nodes:input.nodes.map((n:{nodeId:string})=>({nodeId:n.nodeId,implicitIntent:'The professor needs a specific time.',culturalContext:'A polite question can give the other person room to answer. Preferences vary.',practiceTip:'Keep the timeline specific.',strengths:['You were considerate.'],improvements:[],shortcomings:[]}))}});}
   throw new Error('Unexpected request');
  };
  try{
@@ -25,5 +25,13 @@ test('Report creation is idempotent, survives owner migration and praises good a
   assert.equal((await api('/chapter-generations',undefined,b.accessToken)).data.length,0);
   assert.equal((await api('/sessions/'+play.id+'/report',undefined,a.accessToken)).status,401);
   await api('/sessions/'+play.id+'/report',{},b.accessToken);assert.equal(reports,1);
+  assert.equal(ready.report.policyVersion,'report-v2-concise');
+  assert.ok(ready.report.details.every((d:any)=>d.coaching.strengths[0]==='You were considerate.'));
+  assert.equal((await api('/sessions/'+play.id+'/report?language=ja',undefined,b.accessToken)).status,404);
+  const japanese=(await api('/sessions/'+play.id+'/report?language=ja',{},b.accessToken)).data;
+  assert.notEqual(japanese.reportId,first.reportId);await workOne();
+  assert.equal((await api('/sessions/'+play.id+'/report?language=ja',undefined,b.accessToken)).data.report.language,'ja');
+  assert.equal((await api('/sessions/'+play.id+'/report?language=en',undefined,b.accessToken)).data.report.id,first.reportId);
+  assert.equal(reports,2);
  }finally{globalThis.fetch=real;}
 });
