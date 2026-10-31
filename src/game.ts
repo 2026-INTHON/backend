@@ -159,6 +159,12 @@ export async function submitTurn(id: string, sessionId: string, input: TurnInput
     const badEnding=failed||(lastSuccess&&play!.scenario.endings?.some(e=>e.id===grade.endingId&&e.kind==='bad'))||false;
     grade.emotion=CharacterImages.endingEmotion(grade.emotion,badEnding,failed);
     const selectedImage=await CharacterImages.render('',play!.scenario.characterId,grade.emotion,grade.gesture,grade.imageAssetKey,failed||(badEnding&&grade.endingId!=='deferred'));
+    if(failed&&play!.scenario.pack==='ko'&&!Endings.preserveSafetyDialogue(grade.npcReply)){
+      grade.npcReply=Endings.failureDialogue(play!,grade.emotion,selectedImage.reaction);
+      grade.npcReplySubtitle=play!.subtitles?.[grade.npcReply]||'';
+      grade.action=selectedImage.label||'감정을 드러내며 대화를 끝낸다.';
+      grade.cues=[{k:'표정',v:selectedImage.label||grade.emotion},{k:'억양',v:grade.emotion==='sad'?'말끝이 떨리며 작아진다.':'짧고 날카롭게 말을 끊는다.'}];
+    }
     const { value } = await mutate(id, p => {
       const current = getPlay(p, sessionId), stored = current.turns.find(t => t.id === turnId);
       if (!stored || stored.status !== 'pending' || current.nodeIndex !== play!.nodeIndex) throw new ApiError('TURN_SUPERSEDED', '장면 상태가 바뀌었어요. 다시 확인해 주세요.', 409, true);
