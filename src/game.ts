@@ -158,7 +158,7 @@ export async function submitTurn(id: string, sessionId: string, input: TurnInput
     const lastSuccess=assessment.progression==='advance'&&play!.nodeIndex===play!.scenario.nodes.length-1;
     const badEnding=failed||(lastSuccess&&play!.scenario.endings?.some(e=>e.id===grade.endingId&&e.kind==='bad'))||false;
     grade.emotion=CharacterImages.endingEmotion(grade.emotion,badEnding,failed);
-    const selectedImage=await CharacterImages.render('',play!.scenario.characterId,grade.emotion,grade.gesture,grade.imageAssetKey,badEnding&&grade.endingId!=='deferred');
+    const selectedImage=await CharacterImages.render('',play!.scenario.characterId,grade.emotion,grade.gesture,grade.imageAssetKey,failed||(badEnding&&grade.endingId!=='deferred'));
     const { value } = await mutate(id, p => {
       const current = getPlay(p, sessionId), stored = current.turns.find(t => t.id === turnId);
       if (!stored || stored.status !== 'pending' || current.nodeIndex !== play!.nodeIndex) throw new ApiError('TURN_SUPERSEDED', '장면 상태가 바뀌었어요. 다시 확인해 주세요.', 409, true);
@@ -224,4 +224,3 @@ export async function transcribe(id: string, file: File, pack: 'ko' | 'en') {
   await mutate(id, p => { p.state.speechDrafts = p.state.speechDrafts.filter(d => Date.parse(d.expiresAt) > Date.now()).slice(-9); p.state.speechDrafts.push(speech); });
   return { transcriptId: speech.id, text: speech.text, audioMetrics: speech.metrics, expiresAt: speech.expiresAt, editable: true as const };
 }
-

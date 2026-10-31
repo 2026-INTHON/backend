@@ -197,4 +197,3 @@ app.post('/internal/generation-worker',async c=>{const expected=process.env.MALO
 export const documentConfig = { openapi: '3.1.0' as const, info: { title: 'Malo Backend API', version: '0.1.0', description: 'React Native + Expo FE용 API. 기본 Mock 채점, 선택 시 Live AI. Guest 영속 저장 및 Google 회원 이관. 상점/구독은 화면용 데이터만 제공합니다.' }, servers: [{ url: '/', description: '현재 서버' }], security: [] };
 app.doc31('/openapi.json', documentConfig);
 app.get('/docs', swaggerUI({ url: '/api/v1/openapi.json', persistAuthorization: false }));
-
