@@ -34,11 +34,12 @@ export const Session = z.object({
   npc: z.object({gesture:Gesture.default('idle'),render:CharacterRender.nullable().default(null), subtitle:z.object({language:SubtitleLanguage,text:z.string()}).nullable().default(null),audioUrl:z.string().nullable().default(null),text: z.string(), emotion: Emotion, assetKey: z.string(), action: z.string().default(''), cues: z.array(Cue).default([]) }), choices: z.array(Choice),
   chapterId:z.string().nullable().default(null), backgroundUrl:z.string().nullable().default(null), branchId:z.string().nullable().default(null), hintsUsed: z.number(), createdAt: z.string(), updatedAt: z.string(),
 }).openapi('PlaySession');
+export const ReactionEvaluation=z.object({reaction:Emotion,label:z.string(),reason:z.string(),reasonSubtitle:z.object({language:SubtitleLanguage,text:z.string()}).nullable(),goalAchieved:z.boolean(),progression:z.enum(['advance','retry']),policyVersion:z.literal('reaction-v1-draft'),provisional:z.literal(true)}).openapi('ReactionEvaluation');
 export const Turn = z.object({ id: z.string().uuid(), clientTurnId: z.string(), inputType: z.enum(['text', 'choice', 'voice']), text: z.string(),
   outcome: z.enum(['correct', 'misunderstanding', 'clarify']), confidence: z.number(), feedback: Feedback,
   nodeId: z.string().default(''), mark: z.enum(['O', '△', 'X']).optional(), native: z.boolean().default(false), attempt: z.number().int().min(1).default(1),
   comparison: z.object({ firstAnswer: z.string(), currentAnswer: z.string(), improved: z.boolean() }).nullable().default(null),
-  gesture:Gesture.default('idle'),render:CharacterRender.nullable().default(null), npcReplySubtitle:z.object({language:SubtitleLanguage,text:z.string()}).nullable().default(null),audioUrl:z.string().nullable().default(null), npcReply: z.string(), action: z.string().default(''), cues: z.array(Cue).default([]), emotion: Emotion, lifeDelta: z.number(), provider: z.string(), isMock: z.boolean(), createdAt: z.string(),
+  evaluation:ReactionEvaluation.nullable().default(null),gesture:Gesture.default('idle'),render:CharacterRender.nullable().default(null), npcReplySubtitle:z.object({language:SubtitleLanguage,text:z.string()}).nullable().default(null),audioUrl:z.string().nullable().default(null), npcReply: z.string(), action: z.string().default(''), cues: z.array(Cue).default([]), emotion: Emotion, lifeDelta: z.number(), provider: z.string(), isMock: z.boolean(), createdAt: z.string(),
 }).openapi('Turn');
 export const Result = z.object({ sessionId: z.string(), passed: z.boolean(), score: z.number(),
   goodUtterances: z.array(z.object({ text: z.string(), reason: z.string() })),

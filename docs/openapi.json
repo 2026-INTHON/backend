@@ -1020,6 +1020,9 @@
               "improved"
             ]
           },
+          "evaluation": {
+            "$ref": "#/components/schemas/ReactionEvaluation"
+          },
           "gesture": {
             "type": "string",
             "enum": [
@@ -1239,6 +1242,83 @@
           "who",
           "meaning",
           "cue"
+        ]
+      },
+      "ReactionEvaluation": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "reaction": {
+            "$ref": "#/components/schemas/Emotion"
+          },
+          "label": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "reasonSubtitle": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "language": {
+                "type": "string",
+                "enum": [
+                  "en",
+                  "ja",
+                  "zh",
+                  "vi",
+                  "es",
+                  "id",
+                  "ko"
+                ]
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "language",
+              "text"
+            ]
+          },
+          "goalAchieved": {
+            "type": "boolean"
+          },
+          "progression": {
+            "type": "string",
+            "enum": [
+              "advance",
+              "retry"
+            ]
+          },
+          "policyVersion": {
+            "type": "string",
+            "enum": [
+              "reaction-v1-draft"
+            ]
+          },
+          "provisional": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "default": null,
+        "required": [
+          "reaction",
+          "label",
+          "reason",
+          "reasonSubtitle",
+          "goalAchieved",
+          "progression",
+          "policyVersion",
+          "provisional"
         ]
       },
       "SubmitTurnResult": {
@@ -6777,6 +6857,32 @@
                               "type": "number",
                               "minimum": 0,
                               "maximum": 100
+                            },
+                            "reaction": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "enum": [
+                                "happy",
+                                "neutral",
+                                "angry",
+                                "sad",
+                                "confused",
+                                null
+                              ],
+                              "default": null
+                            },
+                            "goalAchieved": {
+                              "type": [
+                                "boolean",
+                                "null"
+                              ],
+                              "default": null
+                            },
+                            "reasonSubtitle": {
+                              "type": "string",
+                              "default": ""
                             },
                             "gesture": {
                               "type": "string",
