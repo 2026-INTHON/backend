@@ -22,7 +22,7 @@ export function publicPlay(play: Play): SessionValue {
   return { id: play.id, sceneId: play.sceneId, characterId: s.characterId, personalityId: s.personalityId, pack: s.pack, aiMode: play.aiMode,
     status: play.status, lives: play.lives, initialLives: 3, nodeIndex: play.nodeIndex, nodeCount: s.nodes.length,
     briefing: { partner: characters.find(c => c.id === s.characterId)?.role || s.characterId, situation: s.situation, goal: s.goal },
-    npc: { text: node.npcText, emotion: play.emotion, assetKey: `characters/${s.characterId}/${play.emotion}`, action, cues },
+    npc: { subtitle:play.subtitles?.[node.npcText]?{language:play.subtitleLanguage||'en',text:play.subtitles[node.npcText]}:null,audioUrl:null,text: node.npcText, emotion: play.emotion, assetKey: `characters/${s.characterId}/${play.emotion}`, action, cues },
     chapterId:s.chapterId||null, backgroundUrl:s.backgroundUrl||null, branchId:play.branchId||null, choices: play.status === 'active' ? node.choices : [], hintsUsed: play.hintsUsed, createdAt: play.createdAt, updatedAt: play.updatedAt };
 }
 function streak(days: string[]) {
@@ -55,11 +55,14 @@ export function records(p: Profile) {
     frequentMistakes: ['politeness', 'clarity'].map(category => ({ category, count: p.state.mistakes.filter(m => m.category === category).length })).filter(c => c.count),
     streak: streak(p.state.attendance.days), recentSessions: [...p.state.plays].reverse().slice(0, 20).map(s => ({ sessionId: s.id, title: s.scenario.title, status: s.status, score: s.result?.score ?? null, createdAt: s.createdAt })) };
 }
-export async function createPlay(id: string, sceneId: string, aiMode: 'mock' | 'live', customScenario?: Scenario) {
-  const scenario = customScenario || await Content.scene(sceneId,id);
+export async function createPlay(id: string, sceneId: string, aiMode: 'mock' | 'live', customScenario?: Scenario, personalityId?:string,subtitleLanguage?:'en'|'ja'|'zh'|'vi'|'es'|'id'|'ko') {
+  let scenario = customScenario || await Content.scene(sceneId,id);
   if (!scenario) throw new ApiError('SCENE_NOT_FOUND', '장면을 찾지 못했어요.', 404);
+  if(personalityId&&scenario.source!=='personal'){await Content.persona(scenario.characterId,personalityId);scenario={...scenario,personalityId};}
   if(scenario.source==='personal'||scenario.source==='curriculum')aiMode='live';
-  const play: Play = { id: randomUUID(), sceneId, scenario, aiMode, status: 'active', lives: 3, nodeIndex: 0, hintsUsed: 0, emotion: 'neutral', turns: [], history: [], result: null, createdAt: now(), updatedAt: now() };
+  let subtitles:Record<string,string>={};
+  if(aiMode==='live'&&subtitleLanguage){const texts=[...new Set([...scenario.nodes.map(n=>n.npcText),...(scenario.routes||[]).flatMap(r=>r.overrides.map(n=>n.npcText))])];const translated=await aiRequest('/v1/subtitles',{language:subtitleLanguage,texts});if(!Array.isArray(translated.texts)||translated.texts.length!==texts.length)throw new ApiError('SUBTITLE_INVALID','자막을 확인하지 못했어요.',502,true);subtitles=Object.fromEntries(texts.map((text,i)=>[text,translated.texts[i]]));}
+  const play: Play = { id: randomUUID(), sceneId, scenario, aiMode,subtitleLanguage,subtitles, status: 'active', lives: 3, nodeIndex: 0, hintsUsed: 0, emotion: 'neutral', turns: [], history: [], result: null, createdAt: now(), updatedAt: now() };
   await mutate(id, p => {
     if (p.state.plays.length >= 500) throw new ApiError('DEMO_STORAGE_LIMIT', '시연용 장면 저장 한도에 도달했어요.', 409);
     p.state.plays.push(play); p.state.settings.pack = scenario.pack;
@@ -142,7 +145,7 @@ export async function submitTurn(id: string, sessionId: string, input: TurnInput
   if (reservation.value.response) return reservation.value.response;
   const { play, text, metrics } = reservation.value;
   try {
-    const grade = await evaluate(play!.scenario, activeNode(play!), text!, play!.aiMode, metrics, play!.history.map(t => ({ user: t.text, npc: t.npcReply })), play!.nodeIndex===play!.scenario.branchAt ? (play!.scenario.routes||[]).map(r=>r.id) : [], play!.nodeIndex===play!.scenario.nodes.length-1 ? (play!.scenario.endings||[]).map(e=>e.id) : []);
+    const grade = await evaluate(play!.scenario, activeNode(play!), text!, play!.aiMode, metrics, play!.history.map(t => ({ user: t.text, npc: t.npcReply })), play!.nodeIndex===play!.scenario.branchAt ? (play!.scenario.routes||[]).map(r=>r.id) : [], play!.nodeIndex===play!.scenario.nodes.length-1 ? (play!.scenario.endings||[]).map(e=>e.id) : [],play!.subtitleLanguage||'en');
     const { value } = await mutate(id, p => {
       const current = getPlay(p, sessionId), stored = current.turns.find(t => t.id === turnId);
       if (!stored || stored.status !== 'pending' || current.nodeIndex !== play!.nodeIndex) throw new ApiError('TURN_SUPERSEDED', '장면 상태가 바뀌었어요. 다시 확인해 주세요.', 409, true);
@@ -155,7 +158,7 @@ export async function submitTurn(id: string, sessionId: string, input: TurnInput
         comparison: previous.length ? { firstAnswer: previous[0].text, currentAnswer: text!, improved: outcome === 'correct' } : null,
         feedback: { tone: { score: grade.toneScore, label: grade.toneLabel, source: 'text_politeness' }, speed: metrics ? { value: metrics.speed, unit: metrics.speedUnit, estimated: true } : null,
           hesitation: metrics ? { pauseCount: metrics.pauseCount, fillerCount: metrics.fillerCount, estimated: true, note: '낮은 음량 구간과 추임새를 센 추정치예요. 심리 상태를 뜻하지 않아요.' } : null,
-          message: grade.feedback, betterExpression: grade.betterExpression, reason: grade.reason, views: grade.views }, npcReply: grade.npcReply, action: grade.action, cues: grade.cues, emotion: grade.emotion,
+          message: grade.feedback, betterExpression: grade.betterExpression, reason: grade.reason, views: grade.views }, npcReplySubtitle:grade.npcReplySubtitle?{language:current.subtitleLanguage||'en',text:grade.npcReplySubtitle}:null,audioUrl:null,npcReply: grade.npcReply, action: grade.action, cues: grade.cues, emotion: grade.emotion,
         lifeDelta, provider: grade.provider, isMock: grade.isMock, createdAt: now() };
       current.history.push(turn); current.lives += lifeDelta; current.emotion = grade.emotion; current.updatedAt = now();
       let mistakeId: string | null = null;

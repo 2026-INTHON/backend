@@ -91,6 +91,41 @@
           "npc": {
             "type": "object",
             "properties": {
+              "subtitle": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "language": {
+                    "type": "string",
+                    "enum": [
+                      "en",
+                      "ja",
+                      "zh",
+                      "vi",
+                      "es",
+                      "id",
+                      "ko"
+                    ]
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "default": null,
+                "required": [
+                  "language",
+                  "text"
+                ]
+              },
+              "audioUrl": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "default": null
+              },
               "text": {
                 "type": "string"
               },
@@ -919,6 +954,41 @@
               "currentAnswer",
               "improved"
             ]
+          },
+          "npcReplySubtitle": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "language": {
+                "type": "string",
+                "enum": [
+                  "en",
+                  "ja",
+                  "zh",
+                  "vi",
+                  "es",
+                  "id",
+                  "ko"
+                ]
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "default": null,
+            "required": [
+              "language",
+              "text"
+            ]
+          },
+          "audioUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null
           },
           "npcReply": {
             "type": "string"
@@ -4025,7 +4095,7 @@
         "tags": [
           "Play"
         ],
-        "summary": "장면 시작 — 기본 mock, live 선택 가능",
+        "summary": "장면 시작 — FE는 live 명시, 기본 교육과정 성격 선택 가능",
         "security": [
           {
             "BearerAuth": []
@@ -4048,6 +4118,26 @@
                       "live"
                     ],
                     "default": "mock"
+                  },
+                  "personalityId": {
+                    "type": "string",
+                    "enum": [
+                      "strict",
+                      "playful",
+                      "calm"
+                    ]
+                  },
+                  "subtitleLanguage": {
+                    "type": "string",
+                    "enum": [
+                      "en",
+                      "ja",
+                      "zh",
+                      "vi",
+                      "es",
+                      "id",
+                      "ko"
+                    ]
                   }
                 },
                 "required": [
@@ -5750,7 +5840,7 @@
         "tags": [
           "Speech"
         ],
-        "summary": "현재 NPC 대사 TTS — 서명 URL 반환",
+        "summary": "현재 NPC 또는 지정한 반응 대사 TTS — 서명 URL 반환",
         "security": [
           {
             "BearerAuth": []
@@ -5773,7 +5863,12 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "properties": {}
+                "properties": {
+                  "turnId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
               }
             }
           }
@@ -6602,6 +6697,10 @@
                               "type": "number",
                               "minimum": 0,
                               "maximum": 100
+                            },
+                            "npcReplySubtitle": {
+                              "type": "string",
+                              "default": ""
                             },
                             "routeId": {
                               "type": [
