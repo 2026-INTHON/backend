@@ -29,6 +29,8 @@ test('Replay export is durable, contains every answer/reaction and score, dedupl
   for(let i=0;i<15;i++){await workOne();if(rendered)break;}
   assert.ok(rendered);assert.equal(rendered.frames.filter((f:any)=>f.speaker==='learner').length,3);
   assert.equal(rendered.frames.at(-1).speaker,'score');
+  assert.equal(rendered.backgroundUrl,'/api/v1/catalog-assets/bg-street.png');
+  assert.match(rendered.frames.at(-1).text,/힌트 없이 답하기/);
   assert.equal(rendered.frames.filter((f:any)=>f.speaker==='npc').length,voices);
   assert.ok(rendered.frames.filter((f:any)=>f.speaker==='npc').every((f:any)=>f.audioAssetId&&!f.speech));
   assert.ok(rendered.frames.filter((f:any)=>f.speaker==='learner').every((f:any)=>f.text));
