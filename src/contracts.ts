@@ -39,12 +39,13 @@ export const Session = z.object({
   aiMode: z.enum(['mock', 'live']), status: z.enum(['active', 'paused', 'succeeded', 'failed', 'abandoned']),
   lives: z.number(), initialLives: z.number(), nodeIndex: z.number(), nodeCount: z.number(),
   briefing:Briefing,
-  npc: z.object({gesture:Gesture.default('idle'),render:CharacterRender.nullable().default(null), subtitle:z.object({language:SubtitleLanguage,text:z.string()}).nullable().default(null),audioUrl:z.string().nullable().default(null),text: z.string(), emotion: Emotion, assetKey: z.string(), action: z.string().default(''), cues: z.array(Cue).default([]) }), choices: z.array(Choice),
+  npc: z.object({speechLevel:z.enum(['polite','casual']).optional(),gesture:Gesture.default('idle'),render:CharacterRender.nullable().default(null), subtitle:z.object({language:SubtitleLanguage,text:z.string()}).nullable().default(null),audioUrl:z.string().nullable().default(null),text: z.string(), emotion: Emotion, assetKey: z.string(), action: z.string().default(''), cues: z.array(Cue).default([]) }), choices: z.array(Choice),
   chapterId:z.string().nullable().default(null), backgroundUrl:z.string().nullable().default(null), branchId:z.string().nullable().default(null), hintsUsed: z.number(), createdAt: z.string(), updatedAt: z.string(),
 }).openapi('PlaySession');
 export const ReactionEvaluation=z.object({mark:z.enum(['O','△','X','?']),category:z.enum(['excellent','acceptable','inappropriate','off_topic']),label:z.string(),reason:z.string(),reasonSubtitle:z.object({language:SubtitleLanguage,text:z.string()}).nullable(),goalAchieved:z.boolean(),progression:z.enum(['advance','retry']),policyVersion:z.enum(['reaction-v1-draft','judgment-v2-draft']),provisional:z.literal(true)}).openapi('ReactionEvaluation');
 export const Turn = z.object({ id: z.string().uuid(), clientTurnId: z.string(), inputType: z.enum(['text', 'choice', 'voice']), text: z.string(),
-  prompt:z.object({text:z.string(),action:z.string(),cues:z.array(Cue)}).optional(),
+  npcSpeechLevel:z.enum(['polite','casual']).optional(),
+  prompt:z.object({speechLevel:z.enum(['polite','casual']).optional(),text:z.string(),action:z.string(),cues:z.array(Cue)}).optional(),
   outcome: z.enum(['correct', 'misunderstanding', 'clarify']), confidence: z.number(), feedback: Feedback,
   nodeId: z.string().default(''), mark: z.enum(['O', '△', 'X','?']).optional(), native: z.boolean().default(false), attempt: z.number().int().min(1).default(1),
   comparison: z.object({ firstAnswer: z.string(), currentAnswer: z.string(), improved: z.boolean() }).nullable().default(null),

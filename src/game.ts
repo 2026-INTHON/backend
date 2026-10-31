@@ -1,4 +1,5 @@
 import * as Endings from './endings';
+import {initialSpeechLevel} from './dialogue';
 import { translations } from './translations';
 import { conciseBrief } from './briefings';
 import * as CharacterImages from './character-images';
@@ -41,7 +42,7 @@ export function publicPlay(play: Play): SessionValue {
   return { id: play.id, sceneId: play.sceneId, characterId: s.characterId, personalityId: s.personalityId, pack: s.pack, aiMode: play.aiMode,
     status: play.status, lives: play.lives, initialLives: 3, nodeIndex: play.nodeIndex, nodeCount: s.nodes.length,
     briefing:{...brief,translation:translated?{language:play.subtitleLanguage||'en',title:play.subtitles![brief.title],partner:play.subtitles![brief.partner],situation:play.subtitles![brief.situation],goal:play.subtitles![brief.goal]}:null},
-    npc: {gesture:play.gesture||'idle',render:null, subtitle:play.subtitles?.[node.npcText]?{language:play.subtitleLanguage||'en',text:play.subtitles[node.npcText]}:null,audioUrl:null,text: node.npcText, emotion: play.emotion, assetKey: play.imageAssetKey||`characters/${s.characterId}/${play.emotion}`, action, cues },
+    npc: {speechLevel:play.speechLevel||initialSpeechLevel(s.nodes[0].npcText),gesture:play.gesture||'idle',render:null, subtitle:play.subtitles?.[node.npcText]?{language:play.subtitleLanguage||'en',text:play.subtitles[node.npcText]}:null,audioUrl:null,text: node.npcText, emotion: play.emotion, assetKey: play.imageAssetKey||`characters/${s.characterId}/${play.emotion}`, action, cues },
     chapterId:s.chapterId||null, backgroundUrl:s.backgroundUrl||null, branchId:play.branchId||null, choices: play.status === 'active' ? node.choices : [], hintsUsed: play.hintsUsed, createdAt: play.createdAt, updatedAt: play.updatedAt };
 }
 function streak(days: string[]) {
@@ -92,7 +93,7 @@ export async function createPlay(id: string, sceneId: string, aiMode: 'mock' | '
   if(scenario.source==='personal'||scenario.source==='curriculum')aiMode='live';
   let subtitles:Record<string,string>={};
   if(aiMode==='live'&&subtitleLanguage){const texts=[...scenario.nodes.map(n=>n.npcText),...(scenario.routes||[]).flatMap(r=>r.overrides.map(n=>n.npcText)),...Object.values(briefingFor(scenario,sceneId)),...Endings.endingTexts(scenario)];subtitles=await translations(texts,subtitleLanguage);}
-  const play: Play = { id: randomUUID(), sceneId, scenario, aiMode,subtitleLanguage,subtitles, status: 'active', lives: 3, nodeIndex: 0, hintsUsed: 0, emotion: 'neutral', turns: [], history: [], result: null, createdAt: now(), updatedAt: now() };
+  const play: Play = { id: randomUUID(), sceneId, scenario, aiMode,subtitleLanguage,subtitles,speechLevel:initialSpeechLevel(scenario.nodes[0].npcText), status: 'active', lives: 3, nodeIndex: 0, hintsUsed: 0, emotion: 'neutral', turns: [], history: [], result: null, createdAt: now(), updatedAt: now() };
   await mutate(id, p => {
     if (p.state.plays.length >= 500) throw new ApiError('DEMO_STORAGE_LIMIT', '시연용 장면 저장 한도에 도달했어요.', 409);
     p.state.plays.push(play); p.state.settings.pack = scenario.pack;
@@ -135,6 +136,7 @@ export async function correctLastTurn(id:string,sessionId:string,turnId:string){
     const prompt=turn.prompt;
     play.dialogue=prompt?{nodeIndex:index,npcText:prompt.text,action:prompt.action,cues:prompt.cues}:undefined;
     const previous=play.history.at(-2);
+    play.speechLevel=prompt?.speechLevel||previous?.npcSpeechLevel||initialSpeechLevel(play.scenario.nodes[0].npcText);
     play.emotion=previous?.emotion||'neutral';play.gesture=previous?.gesture||'idle';
     play.imageAssetKey=previous?.render?.assetKey;
     // Keep history, spent lives and mistakes; correction cannot farm rewards or erase an answer.
@@ -199,7 +201,7 @@ export async function submitTurn(id: string, sessionId: string, input: TurnInput
   try {
     const imageOptions=(await CharacterImages.variants('')).filter(i=>i.characterId===play!.scenario.characterId&&i.imageUrl).map(({assetKey,emotion,gesture,label,reaction,pose,useWhen,tags,endingPreferred})=>({assetKey,emotion,gesture,label:label||'',reaction:reaction||'',pose:pose||'',useWhen:useWhen||'',tags:tags||[],endingPreferred:endingPreferred||false}));
     const closingAllowed=play!.nodeIndex>=Math.max(1,play!.scenario.nodes.length-2);
-    const grade = await evaluate(play!.scenario, activeNode(play!), text!, play!.aiMode, metrics, play!.history.map(t => ({ user: t.text, npc: t.npcReply })), play!.nodeIndex===play!.scenario.branchAt ? (play!.scenario.routes||[]).map(r=>r.id) : [], closingAllowed ? (play!.scenario.endings||[]).map(e=>e.id) : [],play!.subtitleLanguage||'en',imageOptions,play!.lives,nextCheckpoint(play!),closingAllowed);
+    const grade = await evaluate(play!.scenario, activeNode(play!), text!, play!.aiMode, metrics, play!.history.map(t => ({ user: t.text, npc: t.npcReply })), play!.nodeIndex===play!.scenario.branchAt ? (play!.scenario.routes||[]).map(r=>r.id) : [], closingAllowed ? (play!.scenario.endings||[]).map(e=>e.id) : [],play!.subtitleLanguage||'en',imageOptions,play!.lives,nextCheckpoint(play!),closingAllowed,play!.speechLevel||initialSpeechLevel(play!.scenario.nodes[0].npcText));
     const assessment=assess(grade),failed=play!.lives<=1&&assessment.outcome==='misunderstanding';
     const lastSuccess=assessment.progression==='advance'&&(grade.conversationComplete||play!.nodeIndex===play!.scenario.nodes.length-1);
     const badEnding=failed||(lastSuccess&&play!.scenario.endings?.some(e=>e.id===grade.endingId&&e.kind==='bad'))||false;
@@ -219,14 +221,15 @@ export async function submitTurn(id: string, sessionId: string, input: TurnInput
       const node = activeNode(current);
       const previous = current.history.filter(t => t.nodeId === node.id);
       const turn: TurnValue = { id: turnId, clientTurnId: input.clientTurnId, inputType: input.inputType, text: text!, outcome, confidence: grade.confidence,
-        prompt:{text:node.npcText,action:node.action||'',cues:node.cues||[]},
+        npcSpeechLevel:grade.npcSpeechLevel||current.speechLevel||initialSpeechLevel(current.scenario.nodes[0].npcText),
+        prompt:{speechLevel:current.speechLevel||initialSpeechLevel(current.scenario.nodes[0].npcText),text:node.npcText,action:node.action||'',cues:node.cues||[]},
         nodeId:node.id,mark:assessment.mark,evaluation:{...assessment,reasonSubtitle:assessment.reasonSubtitle?{language:current.subtitleLanguage||'en',text:assessment.reasonSubtitle}:null}, native: grade.native, attempt: previous.length + 1,
         comparison: previous.length ? { firstAnswer: previous[0].text, currentAnswer: text!, improved: outcome === 'correct' } : null,
         feedback: { tone: { score: grade.toneScore, label: grade.toneLabel, source: 'text_politeness' }, speed: metrics ? { value: metrics.speed, unit: metrics.speedUnit, estimated: true } : null,
           hesitation: metrics ? { pauseCount: metrics.pauseCount, fillerCount: metrics.fillerCount, estimated: true, note: '낮은 음량 구간과 추임새를 센 추정치예요. 심리 상태를 뜻하지 않아요.' } : null,
           message: grade.feedback, betterExpression: grade.betterExpression, reason: assessment.reason, views: grade.views }, gesture:grade.gesture,render:selectedImage,npcReplySubtitle:grade.npcReplySubtitle?{language:current.subtitleLanguage||'en',text:grade.npcReplySubtitle}:null,audioUrl:null,npcReply: grade.npcReply, action: grade.action, cues: grade.cues, emotion: grade.emotion,
         lifeDelta, provider: grade.provider, isMock: grade.isMock, createdAt: now() };
-      current.imageAssetKey=selectedImage.assetKey; current.history.push(turn); current.lives += lifeDelta; current.emotion = grade.emotion; current.gesture=grade.gesture; current.updatedAt = now();
+      current.speechLevel=turn.npcSpeechLevel;current.imageAssetKey=selectedImage.assetKey; current.history.push(turn); current.lives += lifeDelta; current.emotion = grade.emotion; current.gesture=grade.gesture; current.updatedAt = now();
       let mistakeId: string | null = null;
       if (outcome !== 'correct' && !grade.native) {
         mistakeId = randomUUID();

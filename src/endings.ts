@@ -1,3 +1,4 @@
+import {initialSpeechLevel} from './dialogue';
 import {Ending} from './contracts';
 import type {Play} from './models';
 import type {Scenario} from './catalog';
@@ -20,6 +21,9 @@ const failureStories={
  safety:{title:'안전을 위해 멈춘 대화',story:'상대는 안전을 우려해 대화를 중단하고 도움을 요청하기로 했어요. 다음 연습에서는 상대의 경계와 안전을 존중하는 표현을 살펴보세요.'},
 };
 const closing={
+ contemptPolite:'이상한 분이네요. 더는 이야기하고 싶지 않아요.',
+ angryPolite:'지금 뭐라고 하셨어요? 장난하세요? 저 이제 그만할게요.',
+ sadPolite:'어떻게 그런 말을 하실 수 있어요? 정말 너무해요… 저 이제 그만할게요.',
  contempt:'뭐야, 이 사람. 이상한 사람 아니야? 더는 이야기하고 싶지 않아.',
  angry:'뭐, 너 뭐라고 했어? 장난해? 나 이제 그만할래.',
  angryFormal:'지금 뭐라고 했나요? 장난이라면 그만하세요. 이런 태도로는 면담을 이어갈 수 없어요.',
@@ -30,6 +34,7 @@ const mentionsPolice=(text:string)=>/경찰|신고|\bpolice\b/i.test(text);
 export function endingTexts(s:Scenario){return [...(s.endings||[]).flatMap(e=>[e.title,e.text]),...Object.values(copy),...Object.values(failureStories).flatMap(v=>[v.title,v.story]),...Object.values(closing)];}
 export function failureDialogue(play:Play,emotion:string,reaction?:string){
  const formal=['professor','manager'].includes(play.scenario.characterId);
+ if(!formal&&(play.speechLevel||initialSpeechLevel(play.scenario.nodes[0].npcText))==='polite')return emotion==='sad'?closing.sadPolite:reaction==='contempt'?closing.contemptPolite:closing.angryPolite;
  if(emotion==='sad')return formal?closing.sadFormal:closing.sad;
  if(reaction==='contempt'&&!formal)return closing.contempt;
  return formal?closing.angryFormal:closing.angry;

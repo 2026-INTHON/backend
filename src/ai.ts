@@ -4,8 +4,9 @@ import { characters, learningSupport, type Scenario, type SceneNode } from './ca
 import type { MetricsValue } from './contracts';
 import { ApiError } from './errors';
 import { personaPrompt } from './personas';
+import {initialSpeechLevel,mentionsSpeechLevel,type SpeechLevel} from './dialogue';
 
-export const Grade = z.object({ conversationComplete:z.boolean().default(false), outcome: z.enum(['correct', 'misunderstanding', 'clarify']), confidence: z.number().min(0).max(1), toneScore: z.number().min(0).max(100),
+export const Grade = z.object({ npcSpeechLevel:z.enum(['polite','casual']).nullable().default(null),conversationComplete:z.boolean().default(false), outcome: z.enum(['correct', 'misunderstanding', 'clarify']), confidence: z.number().min(0).max(1), toneScore: z.number().min(0).max(100),
   imageAssetKey:z.string().nullable().default(null),evaluationMark:z.enum(['O','△','X','?']).nullable().default(null),reaction:z.enum(['happy','neutral','angry','sad','confused']).nullable().default(null),goalAchieved:z.boolean().nullable().default(null),reasonSubtitle:z.string().default(''),gesture:Gesture.default('idle'),npcReplySubtitle:z.string().default(''),routeId:z.string().nullable().optional(),endingId:z.string().nullable().optional(),
   native: z.boolean(),
   toneLabel: z.string(), feedback: z.string(), betterExpression: z.string(), reason: z.string(), npcReply: z.string(),
@@ -26,8 +27,9 @@ export async function aiRequest(path: string, body?: unknown, form?: FormData) {
     throw new ApiError('AI_UNAVAILABLE', 'AI 연결에 실패했어요. 체력 차감 없이 다시 시도해 주세요.', 502, true);
   }
 }
-export async function evaluate(scenario: Scenario, node: SceneNode, text: string, mode: 'mock' | 'live', metrics: MetricsValue | null = null, history: { user: string; npc: string }[] = [], allowedRoutes:string[]=[], allowedEndings:string[]=[],subtitleLanguage:string='en',imageOptions:unknown[]=[],livesRemaining=3,nextCheckpoint:{goal:string;draftLine:string;routeLines:Record<string,string>}|null=null,closingAllowed=false ) {
+export async function evaluate(scenario: Scenario, node: SceneNode, text: string, mode: 'mock' | 'live', metrics: MetricsValue | null = null, history: { user: string; npc: string }[] = [], allowedRoutes:string[]=[], allowedEndings:string[]=[],subtitleLanguage:string='en',imageOptions:unknown[]=[],livesRemaining=3,nextCheckpoint:{goal:string;draftLine:string;routeLines:Record<string,string>}|null=null,closingAllowed=false,npcSpeechLevel:SpeechLevel=initialSpeechLevel(scenario.nodes[0].npcText) ) {
   const support = learningSupport(scenario, node);
+  const allowSpeechLevelChange=mentionsSpeechLevel(text)||mentionsSpeechLevel(node.npcText);
   if (mode === 'mock') {
     const bad = text === node.choices[2]?.text || /닥쳐|멍청|꺼져|니가 알아서|몰라요|싫어요|shut up|whatever/i.test(text);
     const unclear = text === node.choices[0].text || text.length < 4 || /^(yes|no|ok|네|응|아니)[.!]?$/i.test(text);
@@ -43,9 +45,10 @@ export async function evaluate(scenario: Scenario, node: SceneNode, text: string
   }
   const result = Grade.safeParse(await aiRequest('/v1/turns/evaluate', { mode, pack: scenario.pack, characterId: scenario.characterId, personalityId: scenario.personalityId,
     persona:personaPrompt(scenario.characterId,scenario.personalityId),
-    situation: scenario.situation, node: { ...node, ...support }, text, history: history.slice(-4), audioMetrics: metrics,allowedRoutes,allowedEndings,subtitleLanguage,imageOptions,livesRemaining,nextCheckpoint,closingAllowed }));
+    situation: scenario.situation, node: { ...node, ...support }, text, history: history.slice(-12), audioMetrics: metrics,allowedRoutes,allowedEndings,subtitleLanguage,imageOptions,livesRemaining,nextCheckpoint,closingAllowed,npcSpeechLevel,allowSpeechLevelChange }));
   if (!result.success) throw new ApiError('AI_RESPONSE_INVALID', 'AI 응답을 확인하지 못했어요. 체력 차감 없이 다시 시도해 주세요.', 502, true);
   const grade = result.data;
+  grade.npcSpeechLevel=allowSpeechLevelChange?(grade.npcSpeechLevel||npcSpeechLevel):npcSpeechLevel;
   // Language help is a retry, even if a provider incorrectly graded it as a clear mistake.
   grade.native=needsLanguageHelp(text,scenario.pack,grade.native);
   const assessment=assess({...grade,subtitleLanguage});
