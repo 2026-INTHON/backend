@@ -13,6 +13,10 @@ test('Four marks separate learning judgment from NPC emotion and adapt old recor
  const native=assess({...base,evaluationMark:'O',native:true});assert.equal(native.mark,'△');assert.equal(native.outcome,'clarify');
  assert.equal(assess({...base,evaluationMark:'O',emotion:'sad'}).mark,'O');
  assert.equal(assess({...base,evaluationMark:'?',native:true}).mark,'?');
+ assert.equal(assess({...base,evaluationMark:'X',native:true}).mark,'X');
+ assert.equal(assess({...base,evaluationMark:'X',native:true}).outcome,'misunderstanding');
+ assert.equal(assess({...base,evaluationMark:'X',native:true,confidence:.4}).mark,'?');
+ assert.equal(assess({...base,evaluationMark:'O'}).policyVersion,'judgment-v3-draft');
  const historical=upgradeEvaluation({reaction:'sad',reason:'original',policyVersion:'reaction-v1-draft'}) as Record<string,unknown>;
  assert.equal(historical.mark,'X');assert.equal(historical.reason,'original');assert.equal(historical.policyVersion,'reaction-v1-draft');
 });
