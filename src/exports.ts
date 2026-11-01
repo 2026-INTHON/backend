@@ -99,7 +99,14 @@ export async function processExport(raw:Job,worker:string){
   cp.payload ||= await payload(j,play,profile.state.settings.voiceSpeed);
   const speechFrames=cp.payload.frames.filter(f=>f.speech);const index=cp.audioIndex||0;
   if(index<speechFrames.length){
-   const audio=await aiRequest('/v1/speech/synthesize',speechFrames[index].speech);speechFrames[index].audioAssetId=audio.assetId;cp.audioIndex=index+1;
+   // Cached speech is cheap: do not spend a worker timer interval on every sentence.
+   // Bound each batch and checkpoint each asset; a slow provider still yields its slot.
+   const started=Date.now();
+   for(let i=index;i<Math.min(index+8,speechFrames.length);i++){
+    if(i>index&&Date.now()-started>=20000)break;
+    const audio=await aiRequest('/v1/speech/synthesize',speechFrames[i].speech);speechFrames[i].audioAssetId=audio.assetId;cp.audioIndex=i+1;
+    if(!await patchJob(j.id,worker,{checkpoint:cp,stage:`audio:${cp.audioIndex}/${speechFrames.length}`,updated_at:now()}))throw new ApiError('EXPORT_LEASE_LOST','내보내기 작업이 다른 곳에서 이어지고 있어요.',409,false);
+   }
    await patchJob(j.id,worker,{checkpoint:cp,status:'queued',stage:`audio:${cp.audioIndex}/${speechFrames.length}`,attempts:0,worker_token:null,lease_until:null,updated_at:now()});
    return {worked:true,id:j.id,status:'queued',kind:'export'};
   }
@@ -108,6 +115,6 @@ export async function processExport(raw:Job,worker:string){
   await patchJob(j.id,worker,{status:'ready',stage:'ready',checkpoint:cp,error:null,updated_at:now()});await notifyCompleted(j.id).catch(()=>{});
   return {worked:true,id:j.id,status:'ready',kind:'export'};
  }catch(error){const e=error instanceof ApiError?error:new ApiError('EXPORT_FAILED','내보내기에 실패했어요. 다시 시도해 주세요.',502,true);const retry=e.retryable&&j.attempts<2;
-  await patchJob(j.id,worker,{status:retry?'queued':'failed',stage:retry?'retrying':'failed',error:{code:e.code,message:e.message,retryable:e.retryable},worker_token:null,lease_until:null,updated_at:now()});return {worked:true,id:j.id,status:retry?'queued':'failed',kind:'export'};
+  await patchJob(j.id,worker,{status:retry?'queued':'failed',stage:retry?'retrying':'failed',checkpoint:j.checkpoint,error:{code:e.code,message:e.message,retryable:e.retryable},worker_token:null,lease_until:null,updated_at:now()});return {worked:true,id:j.id,status:retry?'queued':'failed',kind:'export'};
  }
 }
