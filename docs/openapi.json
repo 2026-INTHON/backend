@@ -1900,7 +1900,8 @@
             "type": "string",
             "enum": [
               "reaction-v1-draft",
-              "judgment-v2-draft"
+              "judgment-v2-draft",
+              "judgment-v3-draft"
             ]
           },
           "provisional": {

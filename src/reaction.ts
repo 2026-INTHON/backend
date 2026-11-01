@@ -9,11 +9,13 @@ export function assess(grade:Input){
  let mark:Mark=grade.evaluationMark||(grade.reaction?legacyMark(grade.reaction):grade.outcome==='correct'?'O':grade.outcome==='misunderstanding'?'X':'△');
  let goalAchieved=mark==='O'||(mark==='△'&&(grade.goalAchieved??grade.outcome==='correct'));
  let reason=grade.reason,reasonSubtitle=grade.reasonSubtitle||'';
- if(grade.native){if(mark!=='?')mark='△';goalAchieved=false;}
+ // Only an explicit current-rubric X can charge for clear conflict in another language.
+ // Legacy outcome alone may have mistaken language-help needs for misunderstanding.
+ if(grade.native){if(mark!=='?'&&grade.evaluationMark!=='X')mark='△';goalAchieved=false;}
  if(mark==='X'&&grade.confidence<.75){mark='?';goalAchieved=false;reason=clarification.ko;reasonSubtitle=clarification[grade.subtitleLanguage||'en']||clarification.en;}
  const progression=goalAchieved&&(mark==='O'||mark==='△')?'advance' as const:'retry' as const;
  const outcome=progression==='advance'?'correct' as const:mark==='X'?'misunderstanding' as const:'clarify' as const;
- return {mark,category:categories[mark],label:labels[mark],reason,reasonSubtitle,goalAchieved,progression,outcome,policyVersion:'judgment-v2-draft' as const,provisional:true as const};
+ return {mark,category:categories[mark],label:labels[mark],reason,reasonSubtitle,goalAchieved,progression,outcome,policyVersion:'judgment-v3-draft' as const,provisional:true as const};
 }
 // Adapt historical display codes without changing their recorded score, reason or policy.
 export function upgradeEvaluation(value:unknown){

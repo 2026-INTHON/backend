@@ -4,6 +4,30 @@ import {app} from '../src/app';
 before(()=>{process.env.MALO_DATA_MODE='sqlite';process.env.MALO_DB_PATH=':memory:';process.env.MALO_AI_URL='http://ai.test';process.env.MALO_JWT_SECRET='test-only-secret-that-is-longer-than-32-characters';});
 async function api(path:string,body?:unknown,token?:string){const r=await app.request('/api/v1'+path,{method:body===undefined?'GET':'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:body===undefined?undefined:JSON.stringify(body)});return {status:r.status,...await r.json()};}
 
+test('After twelve turns AI still receives the original question, answer and explicit retry context',async()=>{
+ const real=globalThis.fetch,requests:any[]=[];
+ globalThis.fetch=async(url,init)=>{
+  assert.ok(String(url).endsWith('/evaluate'));
+  const input=JSON.parse(init!.body as string);requests.push(input);
+  return Response.json({evaluationMark:'△',goalAchieved:false,outcome:'clarify',confidence:.99,toneScore:65,
+   native:false,toneLabel:'확인',feedback:'조금 더 설명해 주세요.',betterExpression:'내일 오후에 제출하겠습니다.',
+   reason:'설명이 더 필요해요.',npcReply:`확인 질문 ${requests.length}`,action:'기다린다.',cues:[{k:'표정',v:'차분하다.'}],
+   views:[{who:'교수',meaning:'확인',cue:'높임말'},{who:'친구',meaning:'확인',cue:'반말'}],emotion:'neutral',provider:'test',isMock:false});
+ };
+ try{
+  const token=(await api('/auth/guest',{})).data.accessToken;
+  const start=(await api('/sessions',{sceneId:'ko-professor-calm',aiMode:'live'},token)).data,path='/sessions/'+start.id;
+  const first=(await api(path+'/turns',{clientTurnId:'first',inputType:'text',text:'내일 오후 세 시에요.'},token)).data;
+  await api(path+'/correction',{turnId:first.turn.id},token);
+  for(let i=0;i<14;i++)assert.equal((await api(path+'/turns',{clientTurnId:'long-'+i,inputType:'text',text:'추가 설명 '+i},token)).status,200);
+  const context=requests.at(-1).history;
+  assert.equal(context.length,14);
+  assert.deepEqual(context[0],{prompt:start.npc.text,user:'내일 오후 세 시에요.',npc:first.turn.npcReply});
+  assert.equal(context[1].prompt,start.npc.text);
+  assert.equal(context.at(-1).user,'추가 설명 12');
+ }finally{globalThis.fetch=real;}
+});
+
 test('Conversation keeps actual replies, explicit correction restores the question, and scoring counts each checkpoint once',async()=>{
  const token=(await api('/auth/guest',{})).data.accessToken;
  const other=(await api('/auth/guest',{})).data.accessToken;
