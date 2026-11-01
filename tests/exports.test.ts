@@ -25,6 +25,8 @@ test('Replay export is durable, contains every answer/reaction and score, dedupl
  };
  try{
   await workOne(); // persisted audio step, then change owner and continue
+  assert.ok(voices>1,'cached speech is processed in a batch, not one sentence per timer tick');
+  assert.equal(Boolean(rendered),false,'rendering gets a separate lease after the audio batch');
   await mergeProfiles(a.user.id,b.user.id);
   for(let i=0;i<15;i++){await workOne();if(rendered)break;}
   assert.ok(rendered);assert.equal(rendered.frames.filter((f:any)=>f.speaker==='learner').length,3);
